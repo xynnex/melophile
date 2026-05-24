@@ -255,38 +255,58 @@ class SongProvider extends ChangeNotifier {
   Future<bool> _requestStoragePermission() async {
     if (!Platform.isAndroid) return true;
 
-    if (await Permission.storage.isGranted) return true;
-    if (await Permission.audio.isGranted) return true;
+    if (await Permission.manageExternalStorage.isGranted) return true;
 
-    final status = await Permission.storage.request();
+    if (await Permission.storage.isGranted) return true;
+
+    final status = await Permission.manageExternalStorage.request();
     return status.isGranted;
   }
 
-  Future<void> pickAudioFiles() async {
-    try {
-      _isScanning = true;
-      notifyListeners();
+  Future<void> pickAndScanFolder() async {
+    if (Platform.isAndroid) {
+      final status = await Permission.manageExternalStorage.request();
+      if (!status.isGranted) {
+        debugPrint('MANAGE_EXTERNAL_STORAGE denied');
+        notifyListeners();
+        return;
+      }
+    }
 
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['mp3', 'wav', 'aac', 'flac', 'm4a', 'ogg', 'wma'],
-        allowMultiple: true,
-        dialogTitle: 'Pilih file musik',
+    try {
+      final result = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'Pilih folder musik',
       );
 
-      if (result != null && result.files.isNotEmpty) {
-        for (final file in result.files) {
-          if (file.path != null) {
-            _addSongFromPath(file.path!);
-          }
-        }
+      if (result != null) {
+        _isScanning = true;
+        notifyListeners();
+        await _scanDirectory(result);
       }
     } catch (e) {
-      debugPrint('pickAudioFiles error: $e');
+      debugPrint('pickAndScanFolder error: $e');
     }
 
     _isScanning = false;
     notifyListeners();
+  }
+
+  Future<void> _scanDirectory(String path) async {
+    try {
+      final dir = Directory(path);
+      if (!await dir.exists()) return;
+
+      await for (final entity in dir.list(recursive: true, followLinks: false)) {
+        if (entity is File) {
+          final ext = entity.path.toLowerCase();
+          if (['.mp3', '.wav', '.aac', '.flac', '.m4a', '.ogg', '.wma'].any((e) => ext.endsWith(e))) {
+            _addSongFromPath(entity.path);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('_scanDirectory error: $e');
+    }
   }
 
   Future<void> scanDefaultDirectories() async {

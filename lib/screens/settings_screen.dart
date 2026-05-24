@@ -26,9 +26,9 @@ class SettingsScreen extends StatelessWidget {
             _buildSectionHeader(context, 'Music Library'),
             _buildMenuTile(
               context,
-              icon: Icons.audio_file_rounded,
-              title: 'Pick Audio Files',
-              subtitle: 'Select MP3, WAV, FLAC files from storage',
+              icon: Icons.folder_open_rounded,
+              title: 'Pick Folder',
+              subtitle: 'Select a folder to scan for music',
               trailing: provider.isScanning
                   ? const SizedBox(
                       width: 20,
@@ -41,7 +41,7 @@ class SettingsScreen extends StatelessWidget {
                   : null,
               onTap: provider.isScanning
                   ? null
-                  : () => provider.pickAudioFiles(),
+                  : () => provider.pickAndScanFolder(),
             ),
             _buildMenuTile(
               context,
