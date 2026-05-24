@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:provider/provider.dart';
+import '../core/responsive.dart';
 import '../providers/song_provider.dart';
 
 class PlayerScreen extends StatelessWidget {
@@ -7,6 +8,8 @@ class PlayerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final res = Responsive(context);
+
     return Consumer<SongProvider>(
       builder: (context, provider, _) {
         final song = provider.currentSong;
@@ -40,21 +43,14 @@ class PlayerScreen extends StatelessWidget {
               ),
             ),
             child: SafeArea(
-              child: Column(
-                children: [
-                  _buildAppBar(context),
-                  const Spacer(flex: 1),
-                  _buildAlbumArt(context, provider),
-                  const Spacer(flex: 2),
-                  _buildSongInfo(context, song),
-                  const SizedBox(height: 24),
-                  _buildProgress(posStr, durStr, progress, provider),
-                  const SizedBox(height: 24),
-                  _buildControls(context, provider),
-                  const SizedBox(height: 20),
-                  _buildVolumeSlider(provider),
-                  const Spacer(flex: 1),
-                ],
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isLandscape = constraints.maxWidth > constraints.maxHeight;
+                  if (isLandscape && res.isTablet) {
+                    return _buildLandscape(context, res, provider, song, posStr, durStr, progress);
+                  }
+                  return _buildPortrait(context, res, provider, song, posStr, durStr, progress);
+                },
               ),
             ),
           ),
@@ -69,18 +65,69 @@ class PlayerScreen extends StatelessWidget {
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  Widget _buildAppBar(BuildContext context) {
+  Widget _buildPortrait(BuildContext context, Responsive res, SongProvider provider,
+      dynamic song, String posStr, String durStr, double progress) {
+    final artSize = res.wp(55).clamp(180.0, 320.0);
+
+    return Column(
+      children: [
+        _buildAppBar(context, res, provider),
+        const Spacer(flex: 1),
+        _buildAlbumArt(artSize, res, provider),
+        const Spacer(flex: 2),
+        _buildSongInfo(context, res, song),
+        SizedBox(height: res.hp(3)),
+        _buildProgress(posStr, durStr, progress, provider, res),
+        SizedBox(height: res.hp(3)),
+        _buildControls(context, provider, res),
+        SizedBox(height: res.hp(2)),
+        _buildVolumeSlider(provider, res),
+        const Spacer(flex: 1),
+      ],
+    );
+  }
+
+  Widget _buildLandscape(BuildContext context, Responsive res, SongProvider provider,
+      dynamic song, String posStr, String durStr, double progress) {
+    final artSize = res.hp(35).clamp(120.0, 240.0);
+
+    return Row(
+      children: [
+        SizedBox(width: res.wp(5)),
+        _buildAlbumArt(artSize, res, provider),
+        SizedBox(width: res.wp(5)),
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildSongInfo(context, res, song),
+              SizedBox(height: res.hp(2)),
+              _buildProgress(posStr, durStr, progress, provider, res),
+              SizedBox(height: res.hp(2)),
+              _buildControls(context, provider, res),
+              SizedBox(height: res.hp(2)),
+              _buildVolumeSlider(provider, res),
+            ],
+          ),
+        ),
+        SizedBox(width: res.wp(5)),
+      ],
+    );
+  }
+
+  Widget _buildAppBar(BuildContext context, Responsive res, SongProvider provider) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: res.wp(2), vertical: res.hp(0.5)),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 28),
+            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white),
+            iconSize: res.sp(28),
             onPressed: () => Navigator.pop(context),
           ),
           const Spacer(),
-          Consumer<SongProvider>(
-            builder: (context, provider, _) => IconButton(
+          if (provider.currentSong != null)
+            IconButton(
               icon: Icon(
                 provider.isFavorite(provider.currentSong!)
                     ? Icons.favorite_rounded
@@ -89,28 +136,28 @@ class PlayerScreen extends StatelessWidget {
                     ? const Color(0xFFF59E0B)
                     : Colors.white38,
               ),
+              iconSize: res.sp(24),
               onPressed: () {
                 if (provider.currentSong != null) {
                   provider.toggleFavorite(provider.currentSong!);
                 }
               },
             ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildAlbumArt(BuildContext context, SongProvider provider) {
+  Widget _buildAlbumArt(double size, Responsive res, SongProvider provider) {
     final isPlaying = provider.isPlaying;
 
     return GestureDetector(
       onTap: () => provider.togglePlayPause(),
       child: Container(
-        width: 260,
-        height: 260,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(48),
+          borderRadius: BorderRadius.circular(size * 0.18),
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -119,8 +166,8 @@ class PlayerScreen extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: const Color(0xFF06B6D4).withValues(alpha: 0.3),
-              blurRadius: 40,
-              offset: const Offset(0, 10),
+              blurRadius: size * 0.15,
+              offset: Offset(0, size * 0.04),
             ),
           ],
         ),
@@ -128,35 +175,35 @@ class PlayerScreen extends StatelessWidget {
           child: Icon(
             isPlaying ? Icons.equalizer_rounded : Icons.play_arrow_rounded,
             color: Colors.white,
-            size: 80,
+            size: size * 0.3,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildSongInfo(BuildContext context, dynamic song) {
+  Widget _buildSongInfo(BuildContext context, Responsive res, dynamic song) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
+      padding: EdgeInsets.symmetric(horizontal: res.wp(8)),
       child: Column(
         children: [
           Text(
             song.title,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 24,
+              fontSize: res.sp(24),
               fontWeight: FontWeight.bold,
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: res.hp(1)),
           Text(
             song.artist,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white54,
-              fontSize: 16,
+              fontSize: res.sp(16),
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
@@ -167,9 +214,10 @@ class PlayerScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProgress(String pos, String dur, double progress, SongProvider provider) {
+  Widget _buildProgress(String pos, String dur, double progress,
+      SongProvider provider, Responsive res) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
+      padding: EdgeInsets.symmetric(horizontal: res.wp(8)),
       child: Column(
         children: [
           SliderTheme(
@@ -191,12 +239,12 @@ class PlayerScreen extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: EdgeInsets.symmetric(horizontal: res.wp(1)),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(pos, style: const TextStyle(color: Colors.white38, fontSize: 12)),
-                Text(dur, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                Text(pos, style: TextStyle(color: Colors.white38, fontSize: res.sp(12))),
+                Text(dur, style: TextStyle(color: Colors.white38, fontSize: res.sp(12))),
               ],
             ),
           ),
@@ -205,7 +253,9 @@ class PlayerScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildControls(BuildContext context, SongProvider provider) {
+  Widget _buildControls(BuildContext context, SongProvider provider, Responsive res) {
+    final btnSize = res.wp(12).clamp(40.0, 64.0);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -213,32 +263,33 @@ class PlayerScreen extends StatelessWidget {
           icon: Icon(
             provider.isShuffled ? Icons.shuffle_on_rounded : Icons.shuffle_rounded,
             color: provider.isShuffled ? const Color(0xFF06B6D4) : Colors.white38,
-            size: 24,
+            size: res.sp(24),
           ),
           onPressed: () => provider.toggleShuffle(),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: res.wp(3)),
         Container(
           decoration: BoxDecoration(
             color: Colors.white10,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(btnSize * 0.25),
           ),
           child: IconButton(
-            icon: const Icon(Icons.skip_previous_rounded, color: Colors.white, size: 30),
+            icon: const Icon(Icons.skip_previous_rounded, color: Colors.white),
+            iconSize: res.sp(30),
             onPressed: () => provider.previousSong(),
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: res.wp(3)),
         Container(
-          width: 64,
-          height: 64,
+          width: btnSize,
+          height: btnSize,
           decoration: BoxDecoration(
             color: const Color(0xFF06B6D4),
-            borderRadius: BorderRadius.circular(32),
+            borderRadius: BorderRadius.circular(btnSize * 0.5),
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF06B6D4).withValues(alpha: 0.4),
-                blurRadius: 16,
+                blurRadius: btnSize * 0.25,
               ),
             ],
           ),
@@ -246,23 +297,24 @@ class PlayerScreen extends StatelessWidget {
             icon: Icon(
               provider.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
               color: Colors.white,
-              size: 34,
             ),
+            iconSize: res.sp(34),
             onPressed: () => provider.togglePlayPause(),
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: res.wp(3)),
         Container(
           decoration: BoxDecoration(
             color: Colors.white10,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(btnSize * 0.25),
           ),
           child: IconButton(
-            icon: const Icon(Icons.skip_next_rounded, color: Colors.white, size: 30),
+            icon: const Icon(Icons.skip_next_rounded, color: Colors.white),
+            iconSize: res.sp(30),
             onPressed: () => provider.nextSong(),
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: res.wp(3)),
         IconButton(
           icon: Icon(
             provider.repeatMode == RepeatMode.one
@@ -273,7 +325,7 @@ class PlayerScreen extends StatelessWidget {
             color: provider.repeatMode != RepeatMode.none
                 ? const Color(0xFF06B6D4)
                 : Colors.white38,
-            size: 24,
+            size: res.sp(24),
           ),
           onPressed: () => provider.cycleRepeatMode(),
         ),
@@ -281,12 +333,12 @@ class PlayerScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildVolumeSlider(SongProvider provider) {
+  Widget _buildVolumeSlider(SongProvider provider, Responsive res) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 48),
+      padding: EdgeInsets.symmetric(horizontal: res.wp(12)),
       child: Row(
         children: [
-          Icon(Icons.volume_down_rounded, color: Colors.white38, size: 18),
+          Icon(Icons.volume_down_rounded, color: Colors.white38, size: res.sp(18)),
           Expanded(
             child: SliderTheme(
               data: SliderThemeData(
@@ -304,7 +356,7 @@ class PlayerScreen extends StatelessWidget {
               ),
             ),
           ),
-          Icon(Icons.volume_up_rounded, color: Colors.white38, size: 18),
+          Icon(Icons.volume_up_rounded, color: Colors.white38, size: res.sp(18)),
         ],
       ),
     );

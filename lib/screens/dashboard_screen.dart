@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../core/responsive.dart';
 import '../providers/song_provider.dart';
 import '../widgets/song_card.dart';
 import 'settings_screen.dart';
@@ -19,141 +20,139 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final res = Responsive(context);
     final provider = context.watch<SongProvider>();
     final quote = _quotes[DateTime.now().day % _quotes.length];
     final hasData = provider.totalPlays > 0;
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 32),
-          _buildHeader(context, quote),
-          const SizedBox(height: 24),
-          _buildWeeklyChart(context, provider),
-          const SizedBox(height: 24),
-          _buildStatsRow(context, provider),
-          if (hasData) ...[
-            const SizedBox(height: 24),
-            _buildNowPlayingCard(context, provider),
-          ],
-          const SizedBox(height: 24),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: res.wp(5)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: res.hp(4)),
+            _buildHeader(context, res, quote),
+            SizedBox(height: res.hp(3)),
+            _buildWeeklyChart(context, res, provider),
+            SizedBox(height: res.hp(3)),
+            _buildStatsRow(context, res, provider),
+            if (hasData) ...[
+              SizedBox(height: res.hp(3)),
+              _buildNowPlayingCard(context, res, provider),
+            ],
+            SizedBox(height: res.hp(3)),
+            Text(
               'Recently Played',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-          ),
-          const SizedBox(height: 12),
-          if (provider.recentHistory.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
+            SizedBox(height: res.hp(1.5)),
+            if (provider.recentHistory.isEmpty)
+              Text(
                 'No songs played yet. Start listening!',
                 style: Theme.of(context).textTheme.bodyMedium,
+              )
+            else
+              ...provider.recentHistory.map(
+                (song) => SongCard(song: song, showFavorite: false),
               ),
-            )
-          else
-            ...provider.recentHistory.map(
-              (song) => SongCard(song: song, showFavorite: false),
-            ),
-          const SizedBox(height: 24),
-        ],
+            SizedBox(height: res.hp(4)),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, String quote) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome back,',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Boss',
-                  style: Theme.of(context).textTheme.headlineLarge,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '"$quote"',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontStyle: FontStyle.italic,
-                    color: const Color(0xFF06B6D4),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Row(
+  Widget _buildHeader(BuildContext context, Responsive res, String quote) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const SettingsScreen(),
-                  ),
-                ),
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E1E),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.06),
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.settings_rounded,
-                    color: Colors.white54,
-                    size: 22,
-                  ),
+              Text(
+                'Welcome back,',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              SizedBox(height: res.hp(0.3)),
+              Text(
+                'Boss',
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontSize: res.sp(28),
                 ),
               ),
-              const SizedBox(width: 10),
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF06B6D4), Color(0xFFF59E0B)],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.person_rounded,
-                  color: Colors.white,
+              SizedBox(height: res.hp(1)),
+              Text(
+                '"$quote"',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontStyle: FontStyle.italic,
+                  color: const Color(0xFF06B6D4),
+                  fontSize: res.sp(13),
                 ),
               ),
             ],
           ),
-        ],
-      ),
+        ),
+        Row(
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SettingsScreen(),
+                ),
+              ),
+              child: Container(
+                width: res.wp(10),
+                height: res.wp(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E),
+                  borderRadius: BorderRadius.circular(res.wp(3)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.06),
+                  ),
+                ),
+                child: Icon(
+                  Icons.settings_rounded,
+                  color: Colors.white54,
+                  size: res.sp(22),
+                ),
+              ),
+            ),
+            SizedBox(width: res.wp(2)),
+            Container(
+              width: res.wp(11),
+              height: res.wp(11),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF06B6D4), Color(0xFFF59E0B)],
+                ),
+                borderRadius: BorderRadius.circular(res.wp(3.5)),
+              ),
+              child: Icon(
+                Icons.person_rounded,
+                color: Colors.white,
+                size: res.sp(24),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
-  Widget _buildWeeklyChart(BuildContext context, SongProvider provider) {
+  Widget _buildWeeklyChart(BuildContext context, Responsive res, SongProvider provider) {
     final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final dayIndex = DateTime.now().weekday - 1;
     final data = provider.weeklyPlays;
     final maxData = data.reduce((a, b) => a > b ? a : b);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(res.wp(4)),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(res.wp(4)),
         color: const Color(0xFF1E1E1E),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.06),
@@ -168,33 +167,33 @@ class DashboardScreen extends StatelessWidget {
               Text(
                 'Weekly Listening',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontSize: 16,
+                  fontSize: res.sp(16),
                 ),
               ),
               Row(
                 children: [
                   Container(
-                    width: 8,
-                    height: 8,
+                    width: res.wp(2),
+                    height: res.wp(2),
                     decoration: const BoxDecoration(
                       color: Color(0xFF06B6D4),
                       shape: BoxShape.circle,
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  SizedBox(width: res.wp(1.5)),
                   Text(
                     '${provider.totalPlays} total plays',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontSize: 11,
+                      fontSize: res.sp(11),
                     ),
                   ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: res.hp(2.5)),
           SizedBox(
-            height: 120,
+            height: res.hp(15),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: List.generate(7, (i) {
@@ -205,7 +204,7 @@ class DashboardScreen extends StatelessWidget {
 
                 return Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: EdgeInsets.symmetric(horizontal: res.wp(0.8)),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -215,13 +214,13 @@ class DashboardScreen extends StatelessWidget {
                             color: isToday
                                 ? const Color(0xFF06B6D4)
                                 : Colors.white38,
-                            fontSize: 10,
+                            fontSize: res.sp(10),
                             fontWeight: isToday ? FontWeight.w600 : FontWeight.normal,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        SizedBox(height: res.hp(0.8)),
                         Container(
-                          height: height.clamp(16, 100),
+                          height: height.clamp(16, res.hp(12)),
                           decoration: BoxDecoration(
                             gradient: isToday
                                 ? const LinearGradient(
@@ -237,17 +236,17 @@ class DashboardScreen extends StatelessWidget {
                                     begin: Alignment.bottomCenter,
                                     end: Alignment.topCenter,
                                   ),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(res.wp(1.5)),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: res.hp(1)),
                         Text(
                           days[i],
                           style: TextStyle(
                             color: isToday
                                 ? const Color(0xFF06B6D4)
                                 : Colors.white38,
-                            fontSize: 11,
+                            fontSize: res.sp(11),
                             fontWeight: isToday ? FontWeight.w600 : FontWeight.normal,
                           ),
                         ),
@@ -263,45 +262,44 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsRow(BuildContext context, SongProvider provider) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        children: [
-          _StatCard(
-            icon: Icons.access_time_rounded,
-            label: 'Listening',
-            value: provider.listeningTimeFormatted,
-            color: const Color(0xFF06B6D4),
-          ),
-          const SizedBox(width: 12),
-          _StatCard(
-            icon: Icons.favorite_rounded,
-            label: 'Favorites',
-            value: '${provider.favorites.length} songs',
-            color: const Color(0xFFF59E0B),
-          ),
-          const SizedBox(width: 12),
-          _StatCard(
-            icon: Icons.music_note_rounded,
-            label: 'Total',
-            value: '${provider.totalPlays}',
-            color: const Color(0xFF06B6D4),
-          ),
-        ],
-      ),
+  Widget _buildStatsRow(BuildContext context, Responsive res, SongProvider provider) {
+    return Row(
+      children: [
+        _StatCard(
+          res: res,
+          icon: Icons.access_time_rounded,
+          label: 'Listening',
+          value: provider.listeningTimeFormatted,
+          color: const Color(0xFF06B6D4),
+        ),
+        SizedBox(width: res.wp(2.5)),
+        _StatCard(
+          res: res,
+          icon: Icons.favorite_rounded,
+          label: 'Favorites',
+          value: '${provider.favorites.length} songs',
+          color: const Color(0xFFF59E0B),
+        ),
+        SizedBox(width: res.wp(2.5)),
+        _StatCard(
+          res: res,
+          icon: Icons.music_note_rounded,
+          label: 'Total',
+          value: '${provider.totalPlays}',
+          color: const Color(0xFF06B6D4),
+        ),
+      ],
     );
   }
 
-  Widget _buildNowPlayingCard(BuildContext context, SongProvider provider) {
+  Widget _buildNowPlayingCard(BuildContext context, Responsive res, SongProvider provider) {
     final currentSong = provider.currentSong;
     if (currentSong == null) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(res.wp(3.5)),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(res.wp(4)),
         gradient: LinearGradient(
           colors: [
             const Color(0xFF06B6D4).withValues(alpha: 0.15),
@@ -317,44 +315,45 @@ class DashboardScreen extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: res.wp(11),
+            height: res.wp(11),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(res.wp(3)),
               gradient: const LinearGradient(
                 colors: [Color(0xFF06B6D4), Color(0xFFF59E0B)],
               ),
             ),
-            child: const Icon(Icons.music_note_rounded, color: Colors.white, size: 24),
+            child:
+                Icon(Icons.music_note_rounded, color: Colors.white, size: res.sp(24)),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: res.wp(3)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Now Playing',
                   style: TextStyle(
-                    color: Color(0xFF06B6D4),
-                    fontSize: 11,
+                    color: const Color(0xFF06B6D4),
+                    fontSize: res.sp(11),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: res.hp(0.5)),
                 Text(
                   currentSong.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
-                    fontSize: 15,
+                    fontSize: res.sp(15),
                     fontWeight: FontWeight.w600,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   currentSong.artist,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white54,
-                    fontSize: 13,
+                    fontSize: res.sp(13),
                   ),
                 ),
               ],
@@ -366,7 +365,7 @@ class DashboardScreen extends StatelessWidget {
                   ? Icons.pause_circle_filled_rounded
                   : Icons.play_circle_fill_rounded,
               color: const Color(0xFF06B6D4),
-              size: 40,
+              size: res.sp(40),
             ),
             onPressed: () => provider.togglePlayPause(),
           ),
@@ -377,12 +376,14 @@ class DashboardScreen extends StatelessWidget {
 }
 
 class _StatCard extends StatelessWidget {
+  final Responsive res;
   final IconData icon;
   final String label;
   final String value;
   final Color color;
 
   const _StatCard({
+    required this.res,
     required this.icon,
     required this.label,
     required this.value,
@@ -393,32 +394,35 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        padding: EdgeInsets.symmetric(
+          vertical: res.hp(2),
+          horizontal: res.wp(2.5),
+        ),
         decoration: BoxDecoration(
           color: const Color(0xFF1E1E1E),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(res.wp(4)),
           border: Border.all(
             color: Colors.white.withValues(alpha: 0.06),
           ),
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 8),
+            Icon(icon, color: color, size: res.sp(22)),
+            SizedBox(height: res.hp(1)),
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white,
-                fontSize: 14,
+                fontSize: res.sp(14),
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 2),
+            SizedBox(height: res.hp(0.3)),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white38,
-                fontSize: 10,
+                fontSize: res.sp(10),
               ),
             ),
           ],

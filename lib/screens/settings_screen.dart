@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import '../core/responsive.dart';
 import '../providers/song_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -9,11 +10,15 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final res = Responsive(context);
     final provider = context.watch<SongProvider>();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: Text(
+          'Settings',
+          style: TextStyle(fontSize: res.sp(18)),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
@@ -24,18 +29,19 @@ class SettingsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 8),
-            _buildSectionHeader(context, 'Music Library'),
+            SizedBox(height: res.hp(1)),
+            _buildSectionHeader(context, res, 'Music Library'),
             _buildMenuTile(
               context,
+              res: res,
               icon: Icons.folder_open_rounded,
               title: 'Pick Folder',
               subtitle: 'Select a folder to scan for music',
               trailing: provider.isScanning
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
+                  ? SizedBox(
+                      width: res.sp(20),
+                      height: res.sp(20),
+                      child: const CircularProgressIndicator(
                         strokeWidth: 2,
                         color: Color(0xFF06B6D4),
                       ),
@@ -47,14 +53,15 @@ class SettingsScreen extends StatelessWidget {
             ),
             _buildMenuTile(
               context,
+              res: res,
               icon: Icons.storage_rounded,
               title: 'Quick Scan',
               subtitle: 'Auto-scan Music & Download folders',
               trailing: provider.isScanning
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
+                  ? SizedBox(
+                      width: res.sp(20),
+                      height: res.sp(20),
+                      child: const CircularProgressIndicator(
                         strokeWidth: 2,
                         color: Color(0xFF06B6D4),
                       ),
@@ -64,15 +71,16 @@ class SettingsScreen extends StatelessWidget {
                   ? null
                   : () => provider.scanDefaultDirectories(),
             ),
-            const Divider(
+            Divider(
               color: Colors.white10,
-              height: 32,
-              indent: 20,
-              endIndent: 20,
+              height: res.hp(4),
+              indent: res.wp(5),
+              endIndent: res.wp(5),
             ),
-            _buildSectionHeader(context, 'Library'),
+            _buildSectionHeader(context, res, 'Library'),
             _buildMenuTile(
               context,
+              res: res,
               icon: Icons.delete_sweep_rounded,
               title: 'Clear Library',
               subtitle: 'Remove all scanned songs',
@@ -83,7 +91,7 @@ class SettingsScreen extends StatelessWidget {
                   builder: (ctx) => AlertDialog(
                     backgroundColor: const Color(0xFF1E1E1E),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(res.wp(4)),
                     ),
                     title: const Text(
                       'Clear Library?',
@@ -116,16 +124,21 @@ class SettingsScreen extends StatelessWidget {
                 );
               },
             ),
-            const SizedBox(height: 24),
-            _buildSectionHeader(context, 'Info'),
+            SizedBox(height: res.hp(3)),
+            _buildSectionHeader(context, res, 'Info'),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: res.wp(5),
+                vertical: res.hp(1),
+              ),
               child: Text(
                 'Melophile v1.0.0',
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: res.sp(14),
+                ),
               ),
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: res.hp(4)),
           ],
         ),
       ),
@@ -178,14 +191,18 @@ class SettingsScreen extends StatelessWidget {
     provider.pickAndScanFolder();
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title) {
+  Widget _buildSectionHeader(BuildContext context, Responsive res, String title) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: res.wp(5),
+        vertical: res.hp(1.5),
+      ),
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
           color: const Color(0xFF06B6D4),
           fontWeight: FontWeight.w600,
+          fontSize: res.sp(16),
         ),
       ),
     );
@@ -193,6 +210,7 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _buildMenuTile(
     BuildContext context, {
+    required Responsive res,
     required IconData icon,
     required String title,
     String? subtitle,
@@ -201,48 +219,52 @@ class SettingsScreen extends StatelessWidget {
     Color? titleColor,
   }) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      margin: EdgeInsets.symmetric(
+        horizontal: res.wp(3),
+        vertical: res.hp(0.3),
+      ),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(res.wp(3)),
         color: Colors.transparent,
       ),
       child: Material(
         color: Colors.transparent,
         child: ListTile(
           leading: Container(
-            width: 40,
-            height: 40,
+            width: res.wp(9),
+            height: res.wp(9),
             decoration: BoxDecoration(
               color: const Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(res.wp(3)),
             ),
-            child: Icon(icon, color: const Color(0xFF06B6D4), size: 22),
+            child: Icon(icon, color: const Color(0xFF06B6D4), size: res.sp(22)),
           ),
           title: Text(
             title,
             style: TextStyle(
               color: titleColor ?? Colors.white,
-              fontSize: 15,
+              fontSize: res.sp(15),
               fontWeight: FontWeight.w500,
             ),
           ),
           subtitle: subtitle != null
               ? Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white38,
-                    fontSize: 12,
+                    fontSize: res.sp(12),
                   ),
                 )
               : null,
           trailing: trailing ??
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 color: Colors.white24,
+                size: res.sp(22),
               ),
           onTap: onTap,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(res.wp(3)),
           ),
         ),
       ),

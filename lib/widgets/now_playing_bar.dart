@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../core/responsive.dart';
 import '../providers/song_provider.dart';
 import '../screens/player_screen.dart';
 
@@ -8,6 +9,8 @@ class NowPlayingBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final res = Responsive(context);
+
     return Consumer<SongProvider>(
       builder: (context, provider, _) {
         if (provider.currentSong == null) {
@@ -23,11 +26,19 @@ class NowPlayingBar extends StatelessWidget {
             ),
           ),
           child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-            padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+            margin: EdgeInsets.symmetric(
+              horizontal: res.wp(5),
+              vertical: res.hp(0.5),
+            ),
+            padding: EdgeInsets.fromLTRB(
+              res.wp(2.5),
+              res.hp(1.2),
+              res.wp(1.5),
+              res.hp(1.2),
+            ),
             decoration: BoxDecoration(
               color: const Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(res.wp(4)),
               border: Border.all(
                 color: const Color(0xFF06B6D4).withValues(alpha: 0.2),
               ),
@@ -42,25 +53,25 @@ class NowPlayingBar extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: res.wp(10),
+                  height: res.wp(10),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(res.wp(3)),
                     gradient: const LinearGradient(
                       colors: [Color(0xFF06B6D4), Color(0xFFF59E0B)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Icon(
                       Icons.music_note_rounded,
                       color: Colors.white,
-                      size: 22,
+                      size: res.sp(22),
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: res.wp(3)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,19 +79,19 @@ class NowPlayingBar extends StatelessWidget {
                     children: [
                       Text(
                         song.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.white,
-                          fontSize: 14,
+                          fontSize: res.sp(14),
                           fontWeight: FontWeight.w600,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: res.hp(0.3)),
                       Text(
                         song.artist,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.white54,
-                          fontSize: 12,
+                          fontSize: res.sp(12),
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -93,7 +104,7 @@ class NowPlayingBar extends StatelessWidget {
                         ? Icons.pause_circle_filled_rounded
                         : Icons.play_circle_fill_rounded,
                     color: const Color(0xFF06B6D4),
-                    size: 38,
+                    size: res.sp(38),
                   ),
                   onPressed: () => provider.togglePlayPause(),
                 ),

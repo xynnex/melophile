@@ -1,6 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import '../core/responsive.dart';
 
 class FloatingNavbar extends StatelessWidget {
   final int currentIndex;
@@ -14,10 +15,15 @@ class FloatingNavbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final res = Responsive(context);
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      margin: EdgeInsets.symmetric(
+        horizontal: res.wp(5),
+        vertical: res.hp(1.5),
+      ),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(res.wp(6)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.3),
@@ -27,17 +33,20 @@ class FloatingNavbar extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(res.wp(6)),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            padding: EdgeInsets.symmetric(
+              horizontal: res.wp(2),
+              vertical: res.hp(1),
+            ),
             decoration: BoxDecoration(
               color: const Color(0xFF1E1E1E).withValues(alpha: 0.95),
               border: Border.all(
                 color: Colors.white.withValues(alpha: 0.1),
               ),
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(res.wp(6)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -47,18 +56,21 @@ class FloatingNavbar extends StatelessWidget {
                   label: 'Dashboard',
                   isSelected: currentIndex == 0,
                   onTap: () => onTap(0),
+                  res: res,
                 ),
                 _NavItem(
                   icon: Icons.library_music_rounded,
                   label: 'Playlist',
                   isSelected: currentIndex == 1,
                   onTap: () => onTap(1),
+                  res: res,
                 ),
                 _NavItem(
                   icon: Icons.queue_music_rounded,
                   label: 'List Song',
                   isSelected: currentIndex == 2,
                   onTap: () => onTap(2),
+                  res: res,
                 ),
               ],
             ),
@@ -74,12 +86,14 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
+  final Responsive res;
 
   const _NavItem({
     required this.icon,
     required this.label,
     required this.isSelected,
     required this.onTap,
+    required this.res,
   });
 
   @override
@@ -89,12 +103,15 @@ class _NavItem extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: res.wp(4),
+          vertical: res.hp(0.8),
+        ),
         decoration: BoxDecoration(
           color: isSelected
               ? const Color(0xFF06B6D4).withValues(alpha: 0.15)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(res.wp(4)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -102,14 +119,14 @@ class _NavItem extends StatelessWidget {
             Icon(
               icon,
               color: isSelected ? const Color(0xFF06B6D4) : Colors.white38,
-              size: 24,
+              size: res.sp(24),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: res.hp(0.5)),
             Text(
               label,
               style: TextStyle(
                 color: isSelected ? const Color(0xFF06B6D4) : Colors.white38,
-                fontSize: 11,
+                fontSize: res.sp(11),
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               ),
             ),

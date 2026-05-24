@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../core/responsive.dart';
 import '../providers/song_provider.dart';
 import '../widgets/song_card.dart';
 
@@ -21,38 +22,37 @@ class _ListSongScreenState extends State<ListSongScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final res = Responsive(context);
     final provider = context.watch<SongProvider>();
     final query = _searchController.text;
     final songs = provider.search(query);
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 32),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: res.wp(5)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: res.hp(4)),
+            Text(
               'Music Library',
-              style: Theme.of(context).textTheme.headlineLarge,
+              style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                fontSize: res.sp(28),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
+            SizedBox(height: res.hp(1)),
+            Text(
               '${provider.songs.length} songs available',
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontSize: res.sp(14),
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
+            SizedBox(height: res.hp(2.5)),
+            Container(
               decoration: BoxDecoration(
                 color: const Color(0xFF1E1E1E).withValues(alpha: 0.7),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(res.wp(4)),
                 border: Border.all(
                   color: Colors.white.withValues(alpha: 0.06),
                 ),
@@ -60,20 +60,24 @@ class _ListSongScreenState extends State<ListSongScreen> {
               child: TextField(
                 controller: _searchController,
                 onChanged: (_) => setState(() {}),
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: Colors.white, fontSize: res.sp(15)),
                 decoration: InputDecoration(
                   hintText: 'Search songs, artists...',
-                  hintStyle: const TextStyle(color: Colors.white38),
-                  prefixIcon: const Icon(
+                  hintStyle: TextStyle(
+                    color: Colors.white38,
+                    fontSize: res.sp(14),
+                  ),
+                  prefixIcon: Icon(
                     Icons.search_rounded,
                     color: Colors.white38,
+                    size: res.sp(22),
                   ),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.clear_rounded,
                             color: Colors.white38,
-                            size: 20,
+                            size: res.sp(20),
                           ),
                           onPressed: () {
                             _searchController.clear();
@@ -82,47 +86,52 @@ class _ListSongScreenState extends State<ListSongScreen> {
                         )
                       : null,
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: res.wp(4),
+                    vertical: res.hp(1.5),
                   ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 20),
-          if (songs.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.library_music_outlined,
-                    size: 64,
-                    color: Colors.white.withValues(alpha: 0.1),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No music found',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white38,
+            SizedBox(height: res.hp(2.5)),
+            if (songs.isEmpty)
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: res.wp(4),
+                  vertical: res.hp(5),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.library_music_outlined,
+                      size: res.wp(15),
+                      color: Colors.white.withValues(alpha: 0.1),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Go to Settings to scan your music folder',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white24,
+                    SizedBox(height: res.hp(2)),
+                    Text(
+                      'No music found',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Colors.white38,
+                        fontSize: res.sp(18),
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            )
-          else
-            ...songs.map((song) => SongCard(song: song)),
-          const SizedBox(height: 24),
-        ],
+                    SizedBox(height: res.hp(1)),
+                    Text(
+                      'Go to Settings to scan your music folder',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white24,
+                        fontSize: res.sp(14),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              )
+            else
+              ...songs.map((song) => SongCard(song: song)),
+            SizedBox(height: res.hp(4)),
+          ],
+        ),
       ),
     );
   }
