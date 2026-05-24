@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import '../providers/song_provider.dart';
 
@@ -41,7 +43,7 @@ class SettingsScreen extends StatelessWidget {
                   : null,
               onTap: provider.isScanning
                   ? null
-                  : () => provider.pickAndScanFolder(),
+                  : () => _pickFolder(context, provider),
             ),
             _buildMenuTile(
               context,
@@ -128,6 +130,52 @@ class SettingsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _pickFolder(BuildContext context, SongProvider provider) async {
+    if (Platform.isAndroid) {
+      final granted = await Permission.manageExternalStorage.isGranted;
+      if (!granted) {
+        final shouldOpen = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1E1E1E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Text(
+              'Storage Permission Needed',
+              style: TextStyle(color: Colors.white, fontSize: 18),
+            ),
+            content: const Text(
+              'Melophile needs "Manage all files" permission to scan your music folders. '
+              'Please enable it in Settings.',
+              style: TextStyle(color: Colors.white60),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Open Settings',
+                  style: TextStyle(color: Color(0xFF06B6D4)),
+                ),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldOpen == true) {
+          await openAppSettings();
+        }
+        return;
+      }
+    }
+
+    provider.pickAndScanFolder();
   }
 
   Widget _buildSectionHeader(BuildContext context, String title) {

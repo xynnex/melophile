@@ -252,11 +252,9 @@ class SongProvider extends ChangeNotifier {
     return _songs;
   }
 
-  Future<bool> _requestStoragePermission() async {
+  Future<bool> _ensureStoragePermission() async {
     if (!Platform.isAndroid) return true;
-
     if (await Permission.manageExternalStorage.isGranted) return true;
-
     if (await Permission.storage.isGranted) return true;
 
     final status = await Permission.manageExternalStorage.request();
@@ -264,13 +262,16 @@ class SongProvider extends ChangeNotifier {
   }
 
   Future<void> pickAndScanFolder() async {
-    if (Platform.isAndroid) {
-      final status = await Permission.manageExternalStorage.request();
-      if (!status.isGranted) {
-        debugPrint('MANAGE_EXTERNAL_STORAGE denied');
-        notifyListeners();
-        return;
-      }
+    if (!Platform.isAndroid) {
+      _isScanning = false;
+      notifyListeners();
+      return;
+    }
+
+    final granted = await _ensureStoragePermission();
+    if (!granted) {
+      _showPermissionDialog();
+      return;
     }
 
     try {
@@ -279,9 +280,12 @@ class SongProvider extends ChangeNotifier {
       );
 
       if (result != null) {
-        _isScanning = true;
-        notifyListeners();
-        await _scanDirectory(result);
+        final realPath = _resolveRealPath(result);
+        if (realPath != null) {
+          _isScanning = true;
+          notifyListeners();
+          await _scanDirectory(realPath);
+        }
       }
     } catch (e) {
       debugPrint('pickAndScanFolder error: $e');
@@ -289,6 +293,18 @@ class SongProvider extends ChangeNotifier {
 
     _isScanning = false;
     notifyListeners();
+  }
+
+  String? _resolveRealPath(String path) {
+    if (path.startsWith('/')) return path;
+    if (path.contains(':')) {
+      try {
+        final parts = path.split(':');
+        final relative = parts.last;
+        return '/storage/emulated/0/$relative';
+      } catch (_) {}
+    }
+    return null;
   }
 
   Future<void> _scanDirectory(String path) async {
@@ -309,15 +325,19 @@ class SongProvider extends ChangeNotifier {
     }
   }
 
+  void _showPermissionDialog() {
+    notifyListeners();
+  }
+
+  Future<void> openPermissionSettings() async {
+    await openAppSettings();
+  }
+
   Future<void> scanDefaultDirectories() async {
     if (!Platform.isAndroid) return;
 
-    final hasPermission = await _requestStoragePermission();
-    if (!hasPermission) {
-      debugPrint('Storage permission denied');
-      notifyListeners();
-      return;
-    }
+    final granted = await _ensureStoragePermission();
+    if (!granted) return;
 
     _isScanning = true;
     notifyListeners();
