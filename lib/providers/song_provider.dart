@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/song.dart';
 
 enum PlaybackState { stopped, playing, paused }
@@ -10,9 +12,8 @@ class SongProvider extends ChangeNotifier {
   final List<Song> _songs = [];
   int _nextId = 1;
   Song? _currentSong;
+  final AudioPlayer _player = AudioPlayer();
   PlaybackState _playbackState = PlaybackState.stopped;
-  Duration _position = Duration.zero;
-  double _volume = 0.8;
   bool _isShuffled = false;
   RepeatMode _repeatMode = RepeatMode.none;
   int _currentIndex = -1;
@@ -21,19 +22,22 @@ class SongProvider extends ChangeNotifier {
   int _totalPlays = 0;
   int _listeningSeconds = 0;
   final List<int> _weeklyPlays = [0, 0, 0, 0, 0, 0, 0];
-  Timer? _timer;
   bool _isScanning = false;
+  StreamSubscription? _positionSub;
+  StreamSubscription? _playerStateSub;
+
+  AudioPlayer get player => _player;
 
   List<Song> get songs => _songs;
   Song? get currentSong => _currentSong;
   PlaybackState get playbackState => _playbackState;
-  Duration get position => _position;
-  Duration get duration => const Duration(seconds: 180);
-  double get volume => _volume;
+  Duration get position => _player.position;
+  Duration get duration => _player.duration ?? const Duration(seconds: 0);
+  double get volume => _player.volume;
   bool get isShuffled => _isShuffled;
   RepeatMode get repeatMode => _repeatMode;
   List<Song> get favorites => _favorites;
-  bool get isPlaying => _playbackState == PlaybackState.playing;
+  bool get isPlaying => _player.playing;
   bool get isScanning => _isScanning;
 
   List<Song> get recentHistory =>
@@ -51,51 +55,99 @@ class SongProvider extends ChangeNotifier {
     return hrs > 0 ? '${hrs}h ${mins}m' : '${mins}m';
   }
 
-  bool isFavorite(Song song) => _favorites.any((s) => s.id == song.id);
+  SongProvider() {
+    _setupPlayerListeners();
+    _setupAudioSession();
+  }
 
-  void _startTimer() {
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_playbackState == PlaybackState.playing) {
-        _listeningSeconds++;
-        _position += const Duration(seconds: 1);
-        notifyListeners();
+  void _setupAudioSession() {
+    _player.setVolume(0.8);
+  }
+
+  Timer? _listeningTimer;
+
+  void _setupPlayerListeners() {
+    _positionSub = _player.positionStream.listen((_) {
+      notifyListeners();
+    });
+
+    _playerStateSub = _player.playerStateStream.listen((state) {
+      if (state.playing) {
+        _listeningTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+          if (_player.playing) {
+            _listeningSeconds++;
+            notifyListeners();
+          }
+        });
+      } else {
+        _listeningTimer?.cancel();
+        _listeningTimer = null;
       }
+
+      switch (state.processingState) {
+        case ProcessingState.completed:
+          _onTrackComplete();
+          break;
+        case ProcessingState.ready:
+          if (_playbackState == PlaybackState.stopped) {
+            _playbackState = PlaybackState.playing;
+          }
+          break;
+        default:
+          break;
+      }
+      notifyListeners();
     });
   }
 
-  void playSong(Song song) {
-    final index = _songs.indexOf(song);
-    if (index != -1) {
-      _currentIndex = index;
-      _currentSong = song;
-      _playbackState = PlaybackState.playing;
-      _position = Duration.zero;
-      _totalPlays++;
-      _recentHistory.insert(0, song);
-      final day = DateTime.now().weekday - 1;
-      _weeklyPlays[day] = _weeklyPlays[day] + 1;
-      _startTimer();
-      notifyListeners();
-    }
-  }
-
-  void togglePlayPause() {
-    if (_currentSong == null && _songs.isNotEmpty) {
-      playSong(_songs[0]);
+  void _onTrackComplete() {
+    if (_repeatMode == RepeatMode.one) {
+      _player.seek(Duration.zero);
+      _player.play();
       return;
     }
-    if (_playbackState == PlaybackState.playing) {
-      _playbackState = PlaybackState.paused;
-      _timer?.cancel();
-    } else {
-      _playbackState = PlaybackState.playing;
-      _startTimer();
+    nextSong();
+  }
+
+  bool isFavorite(Song song) => _favorites.any((s) => s.id == song.id);
+
+  Future<void> playSong(Song song) async {
+    final index = _songs.indexOf(song);
+    if (index == -1) return;
+
+    _currentIndex = index;
+    _currentSong = song;
+    _playbackState = PlaybackState.playing;
+    _totalPlays++;
+    _recentHistory.insert(0, song);
+    final day = DateTime.now().weekday - 1;
+    _weeklyPlays[day] = _weeklyPlays[day] + 1;
+
+    if (song.filePath.isNotEmpty && File(song.filePath).existsSync()) {
+      try {
+        await _player.setFilePath(song.filePath);
+        await _player.play();
+      } catch (e) {
+        debugPrint('playSong error: $e');
+      }
     }
     notifyListeners();
   }
 
-  void nextSong() {
+  Future<void> togglePlayPause() async {
+    if (_currentSong == null && _songs.isNotEmpty) {
+      await playSong(_songs[0]);
+      return;
+    }
+    if (_player.playing) {
+      await _player.pause();
+    } else {
+      await _player.play();
+    }
+    notifyListeners();
+  }
+
+  Future<void> nextSong() async {
     if (_songs.isEmpty) return;
     if (_isShuffled) {
       _currentIndex = DateTime.now().microsecondsSinceEpoch % _songs.length;
@@ -104,39 +156,55 @@ class SongProvider extends ChangeNotifier {
     }
     _currentSong = _songs[_currentIndex];
     _playbackState = PlaybackState.playing;
-    _position = Duration.zero;
     _totalPlays++;
     _recentHistory.insert(0, _currentSong!);
     final day = DateTime.now().weekday - 1;
     _weeklyPlays[day] = _weeklyPlays[day] + 1;
+
+    await _player.stop();
+    if (_currentSong!.filePath.isNotEmpty && File(_currentSong!.filePath).existsSync()) {
+      try {
+        await _player.setFilePath(_currentSong!.filePath);
+        await _player.play();
+      } catch (e) {
+        debugPrint('nextSong error: $e');
+      }
+    }
     notifyListeners();
   }
 
-  void previousSong() {
+  Future<void> previousSong() async {
     if (_songs.isEmpty) return;
-    if (_position > const Duration(seconds: 3)) {
-      _position = Duration.zero;
-      notifyListeners();
+    if (_player.position > const Duration(seconds: 3)) {
+      await _player.seek(Duration.zero);
       return;
     }
     _currentIndex = (_currentIndex - 1 + _songs.length) % _songs.length;
     _currentSong = _songs[_currentIndex];
     _playbackState = PlaybackState.playing;
-    _position = Duration.zero;
     _totalPlays++;
     _recentHistory.insert(0, _currentSong!);
     final day = DateTime.now().weekday - 1;
     _weeklyPlays[day] = _weeklyPlays[day] + 1;
+
+    await _player.stop();
+    if (_currentSong!.filePath.isNotEmpty && File(_currentSong!.filePath).existsSync()) {
+      try {
+        await _player.setFilePath(_currentSong!.filePath);
+        await _player.play();
+      } catch (e) {
+        debugPrint('previousSong error: $e');
+      }
+    }
     notifyListeners();
   }
 
   void seek(Duration position) {
-    _position = position;
-    notifyListeners();
+    _player.seek(position);
   }
 
   void setVolume(double volume) {
-    _volume = volume;
+    _player.setVolume(volume);
     notifyListeners();
   }
 
@@ -149,12 +217,15 @@ class SongProvider extends ChangeNotifier {
     switch (_repeatMode) {
       case RepeatMode.none:
         _repeatMode = RepeatMode.all;
+        _player.setLoopMode(LoopMode.all);
         break;
       case RepeatMode.all:
         _repeatMode = RepeatMode.one;
+        _player.setLoopMode(LoopMode.one);
         break;
       case RepeatMode.one:
         _repeatMode = RepeatMode.none;
+        _player.setLoopMode(LoopMode.off);
         break;
     }
     notifyListeners();
@@ -179,6 +250,16 @@ class SongProvider extends ChangeNotifier {
 
   List<Song> getPlaylistSongs(String playlistName) {
     return _songs;
+  }
+
+  Future<bool> _requestStoragePermission() async {
+    if (!Platform.isAndroid) return true;
+
+    if (await Permission.storage.isGranted) return true;
+    if (await Permission.audio.isGranted) return true;
+
+    final status = await Permission.storage.request();
+    return status.isGranted;
   }
 
   Future<void> pickAudioFiles() async {
@@ -210,6 +291,13 @@ class SongProvider extends ChangeNotifier {
 
   Future<void> scanDefaultDirectories() async {
     if (!Platform.isAndroid) return;
+
+    final hasPermission = await _requestStoragePermission();
+    if (!hasPermission) {
+      debugPrint('Storage permission denied');
+      notifyListeners();
+      return;
+    }
 
     _isScanning = true;
     notifyListeners();
@@ -245,18 +333,29 @@ class SongProvider extends ChangeNotifier {
   }
 
   void clearSongs() {
+    _player.stop();
     _songs.clear();
     _currentSong = null;
     _currentIndex = -1;
     _playbackState = PlaybackState.stopped;
-    _position = Duration.zero;
-    _timer?.cancel();
+    _positionSub?.cancel();
+    _playerStateSub?.cancel();
+    _listeningTimer?.cancel();
+    notifyListeners();
+  }
+
+  Future<void> stopPlayback() async {
+    await _player.stop();
+    _playbackState = PlaybackState.stopped;
     notifyListeners();
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _positionSub?.cancel();
+    _playerStateSub?.cancel();
+    _listeningTimer?.cancel();
+    _player.dispose();
     super.dispose();
   }
 }
