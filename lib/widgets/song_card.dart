@@ -10,6 +10,7 @@ class SongCard extends ConsumerWidget {
   final List<Song>? playlist;
   final VoidCallback? onTap;
   final bool showFavorite;
+  final int? index;
 
   const SongCard({
     super.key,
@@ -17,6 +18,7 @@ class SongCard extends ConsumerWidget {
     this.playlist,
     this.onTap,
     this.showFavorite = true,
+    this.index,
   });
 
   @override
@@ -51,53 +53,80 @@ class SongCard extends ConsumerWidget {
           onTap: onTap ?? () => ref.read(playbackProvider.notifier).play(song, playlist: playlist),
           child: Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: res.wp(2.5),
+              horizontal: res.wp(3),
               vertical: res.hp(1.2),
             ),
             child: Row(
               children: [
+                if (index != null) ...[
+                  SizedBox(
+                    width: res.wp(6),
+                    child: Text(
+                      '${index! + 1}',
+                      style: TextStyle(
+                        color: isCurrent
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.white38,
+                        fontSize: res.sp(14),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  SizedBox(width: res.wp(2)),
+                ],
                 SongArtwork(
                   song: song,
-                  size: res.wp(10),
+                  size: res.wp(12),
                   borderRadius: res.wp(2.5),
                   placeholderIcon: isCurrent ? Icons.equalizer_rounded : Icons.music_note_rounded,
                 ),
-                SizedBox(width: res.wp(3)),
+                SizedBox(width: res.wp(3.5)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         song.title,
                         style: TextStyle(
                           color: isCurrent
                               ? Theme.of(context).colorScheme.primary
-                              : Colors.white,
+                              : Colors.white.withValues(alpha: 0.9),
                           fontSize: res.sp(15),
-                          fontWeight: FontWeight.w500,
+                          fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
+                          letterSpacing: 0.2,
                         ),
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      SizedBox(height: res.hp(0.3)),
+                      SizedBox(height: res.hp(0.4)),
                       Text(
                         song.artist,
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12,
+                        style: TextStyle(
+                          color: isCurrent
+                              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.8)
+                              : Colors.white54,
+                          fontSize: res.sp(13),
+                          fontWeight: FontWeight.w400,
                         ),
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
+                SizedBox(width: res.wp(2)),
                 Text(
                   song.duration,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white38,
-                    fontSize: 12,
+                    fontSize: res.sp(12),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                if (showFavorite)
+                if (showFavorite) ...[
+                  SizedBox(width: res.wp(1)),
                   IconButton(
                     icon: Icon(
                       isFav
@@ -109,12 +138,11 @@ class SongCard extends ConsumerWidget {
                       size: res.sp(20),
                     ),
                     onPressed: () => ref.read(favoritesProvider.notifier).toggle(song),
-                    padding: EdgeInsets.zero,
-                    constraints: BoxConstraints(
-                      minWidth: res.wp(8),
-                      minHeight: res.wp(8),
-                    ),
+                    padding: EdgeInsets.all(res.wp(1)),
+                    constraints: const BoxConstraints(),
+                    splashRadius: res.wp(6),
                   ),
+                ],
               ],
             ),
           ),

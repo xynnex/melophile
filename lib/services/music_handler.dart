@@ -7,8 +7,10 @@ import '../models/song.dart';
 
 class MusicHandler extends BaseAudioHandler with SeekHandler {
   final AudioPlayer _player = AudioPlayer();
+  final _playlist = ConcatenatingAudioSource(children: []);
   Song? _currentSong;
   final _volumeController = StreamController<double>.broadcast();
+  bool _isTransitioning = false;
   
   void Function()? onSkipToNextCall;
   void Function()? onSkipToPreviousCall;
@@ -22,54 +24,34 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
 
-    // Initial state to satisfy Android
-    playbackState.add(PlaybackState(
-      controls: [MediaControl.play],
-      systemActions: const {
-        MediaAction.play,
-        MediaAction.pause,
-        MediaAction.stop,
-        MediaAction.skipToNext,
-        MediaAction.skipToPrevious,
-        MediaAction.seek,
-      },
-      androidCompactActionIndices: const [0],
-      processingState: AudioProcessingState.idle,
-      playing: false,
-    ));
-
-    // Handle audio interruptions (phone calls, etc.)
-    session.interruptionEventStream.listen((event) {
-      if (event.begin) {
-        switch (event.type) {
-          case AudioInterruptionType.pause:
-          case AudioInterruptionType.unknown:
-            pause();
-            break;
-          case AudioInterruptionType.duck:
-            _player.setVolume(0.5);
-            break;
-        }
-      } else {
-        switch (event.type) {
-          case AudioInterruptionType.pause:
-          case AudioInterruptionType.unknown:
-            play();
-            break;
-          case AudioInterruptionType.duck:
-            _player.setVolume(1.0);
-            break;
-        }
-      }
-    });
-
     // Listen to player state changes
     _player.playbackEventStream.listen(_onPlaybackEvent);
     _player.playerStateStream.listen(_onPlayerStateChanged);
     _player.positionStream.listen(_onPositionChanged);
     _player.durationStream.listen(_onDurationChanged);
     _player.volumeStream.listen((v) => _volumeController.add(v));
+    
+    // Listen to sequence state (current index)
+    _player.sequenceStateStream.listen((sequenceState) {
+      if (sequenceState == null) return;
+      final index = sequenceState.currentIndex;
+      if (index >= 0 && index < _playlist.length) {
+        final source = _playlist.children[index] as UriAudioSource;
+        final item = source.tag as MediaItem;
+        mediaItem.add(item);
+        _currentSong = _songFromMediaItem(item);
+      }
+    });
+
+    // Initial state
+    _updatePlaybackState();
     debugPrint('MusicHandler: Initialization complete');
+  }
+
+  Song? _songFromMediaItem(MediaItem item) {
+    // Helper to find song in current provider state might be needed, 
+    // or just rely on MediaItem for UI.
+    return null; 
   }
 
   void _onPlaybackEvent(PlaybackEvent event) {
@@ -78,30 +60,21 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
 
   void _onPlayerStateChanged(PlayerState state) {
     _updatePlaybackState();
-    if (state.processingState == ProcessingState.completed) {
-      skipToNext();
-    }
   }
 
   void _onPositionChanged(Duration position) {
-    _updatePlaybackState();
-  }
-
-  void _onDurationChanged(Duration? duration) {
-    if (duration != null && _currentSong != null) {
-      mediaItem.add(MediaItem(
-        id: _currentSong!.id.toString(),
-        title: _currentSong!.title,
-        artist: _currentSong!.artist,
-        album: _currentSong!.album,
-        duration: duration,
-        displayTitle: _currentSong!.title,
-        displaySubtitle: _currentSong!.artist,
-      ));
+    if (position.inSeconds != playbackState.value.updatePosition.inSeconds) {
+      _updatePlaybackState();
     }
   }
 
-  void _updatePlaybackState({AudioProcessingState? customProcessingState}) {
+  void _onDurationChanged(Duration? duration) {
+    if (duration != null && mediaItem.value != null) {
+      mediaItem.add(mediaItem.value!.copyWith(duration: duration));
+    }
+  }
+
+  void _updatePlaybackState({AudioProcessingState? customProcessingState, bool? forcePlaying}) {
     final stateMapping = {
       ProcessingState.idle: AudioProcessingState.idle,
       ProcessingState.loading: AudioProcessingState.loading,
@@ -110,10 +83,12 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
       ProcessingState.completed: AudioProcessingState.completed,
     };
 
+    final isPlaying = forcePlaying ?? _player.playing;
+
     playbackState.add(playbackState.value.copyWith(
       controls: [
         MediaControl.skipToPrevious,
-        if (_player.playing) MediaControl.pause else MediaControl.play,
+        if (isPlaying) MediaControl.pause else MediaControl.play,
         MediaControl.stop,
         MediaControl.skipToNext,
       ],
@@ -126,38 +101,30 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
         MediaAction.seek,
         MediaAction.seekForward,
         MediaAction.seekBackward,
+        MediaAction.fastForward,
+        MediaAction.rewind,
       },
       androidCompactActionIndices: const [0, 1, 3],
       processingState: customProcessingState ?? (stateMapping[_player.processingState] ?? AudioProcessingState.idle),
-      playing: _player.playing,
+      playing: isPlaying,
       updatePosition: _player.position,
       bufferedPosition: _player.bufferedPosition,
       speed: _player.speed,
+      queueIndex: _player.currentIndex,
     ));
   }
 
   @override
-  Future<void> play() async {
-    debugPrint('MusicHandler: Play command received');
-    await _player.play();
-  }
+  Future<void> play() => _player.play();
 
   @override
-  Future<void> pause() async {
-    debugPrint('MusicHandler: Pause command received');
-    await _player.pause();
-  }
+  Future<void> pause() => _player.pause();
 
   @override
   Future<void> stop() async {
-    debugPrint('MusicHandler: Stopping player');
     await _player.stop();
-    _currentSong = null;
     mediaItem.add(null);
-    playbackState.add(playbackState.value.copyWith(
-      playing: false,
-      processingState: AudioProcessingState.idle,
-    ));
+    _updatePlaybackState();
     await super.stop();
   }
 
@@ -165,71 +132,51 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   Future<void> seek(Duration position) => _player.seek(position);
 
   @override
-  Future<void> skipToNext() async {
-    debugPrint('MusicHandler: Skip to Next');
-    onSkipToNextCall?.call();
-  }
+  Future<void> skipToNext() => _player.seekToNext();
 
   @override
-  Future<void> skipToPrevious() async {
-    debugPrint('MusicHandler: Skip to Previous');
-    onSkipToPreviousCall?.call();
-  }
+  Future<void> skipToPrevious() => _player.seekToPrevious();
 
-  @override
-  Future<void> onTaskRemoved() async {
-    debugPrint('MusicHandler: onTaskRemoved (app swiped)');
-    // If playing, keep service alive. 
-    // Android 14+ needs this explicitly if we want to stay persistent.
-    if (_player.playing) {
-      _updatePlaybackState();
+  Future<void> setPlaylist(List<Song> songs, {int initialIndex = 0}) async {
+    final sources = songs.map((song) {
+      final item = MediaItem(
+        id: song.id.toString(),
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+        displayTitle: song.title,
+        displaySubtitle: song.artist,
+        duration: _parseDuration(song.duration),
+      );
+      return AudioSource.uri(Uri.file(song.filePath), tag: item);
+    }).toList();
+
+    await _playlist.clear();
+    await _playlist.addAll(sources);
+    
+    if (_player.audioSource != _playlist) {
+      await _player.setAudioSource(_playlist, initialIndex: initialIndex);
+    } else {
+      await _player.seek(Duration.zero, index: initialIndex);
     }
-  }
-
-  @override
-  Future<void> onNotificationDeleted() async {
-    debugPrint('MusicHandler: Notification deleted');
-    await stop();
   }
 
   Future<void> playSong(Song song) async {
-    debugPrint('MusicHandler: Starting playback for ${song.title}');
-    _currentSong = song;
+    // Fallback if not using setPlaylist yet
+    await setPlaylist([song]);
+    await _player.play();
+  }
 
-    // 1. Update MediaItem immediately to satisfy Android MediaSession
-    mediaItem.add(MediaItem(
-      id: song.id.toString(),
-      title: song.title,
-      artist: song.artist,
-      album: song.album,
-      displayTitle: song.title,
-      displaySubtitle: song.artist,
-    ));
-
-    // 2. Force true playing and loading state to trigger foreground service immediately
-    playbackState.add(playbackState.value.copyWith(
-      playing: true,
-      processingState: AudioProcessingState.loading,
-      controls: [
-        MediaControl.skipToPrevious,
-        MediaControl.pause,
-        MediaControl.stop,
-        MediaControl.skipToNext,
-      ],
-    ));
-
+  Duration? _parseDuration(String durationStr) {
     try {
-      final source = AudioSource.uri(Uri.file(song.filePath));
-      await _player.setAudioSource(source);
-      await _player.play();
-      
-      // 3. Final state update
-      _updatePlaybackState();
-      debugPrint('MusicHandler: Playback started successfully');
-    } catch (e) {
-      debugPrint('MusicHandler: Error loading audio: $e');
-      _updatePlaybackState(customProcessingState: AudioProcessingState.error);
-    }
+      final parts = durationStr.split(':');
+      if (parts.length == 2) {
+        return Duration(minutes: int.parse(parts[0]), seconds: int.parse(parts[1]));
+      } else if (parts.length == 3) {
+        return Duration(hours: int.parse(parts[0]), minutes: int.parse(parts[1]), seconds: int.parse(parts[2]));
+      }
+    } catch (_) {}
+    return null;
   }
 
   Future<void> togglePlayPause() async {

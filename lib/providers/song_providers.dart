@@ -80,10 +80,22 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   }
 
   void _init() {
-    _audioHandler.onSkipToNextCall = () => nextSong();
-    _audioHandler.onSkipToPreviousCall = () => previousSong();
-    
-    // Sync with audio handler's playback state
+    // Sync with audio handler's mediaItem (for song changes triggered by system)
+    _audioHandler.mediaItem.listen((item) {
+      if (item != null) {
+        final song = state.activePlaylist.firstWhere(
+          (s) => s.id.toString() == item.id,
+          orElse: () => Song(
+            id: int.tryParse(item.id) ?? -1,
+            title: item.title,
+            artist: item.artist ?? 'Unknown Artist',
+            filePath: '',
+          ),
+        );
+        state = state.copyWith(currentSong: song);
+      }
+    });
+
     _audioHandler.playbackState.listen((playbackState) {
       state = state.copyWith(
         isPlaying: playbackState.playing,
@@ -110,11 +122,17 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   }
 
   Future<void> play(Song song, {List<Song>? playlist}) async {
-    await _audioHandler.playSong(song);
+    final list = playlist ?? state.activePlaylist;
     state = state.copyWith(
       currentSong: song,
-      activePlaylist: playlist ?? state.activePlaylist,
+      activePlaylist: list,
     );
+    
+    int index = list.indexWhere((s) => s.id == song.id);
+    if (index == -1) index = 0;
+
+    await _audioHandler.setPlaylist(list, initialIndex: index);
+    await _audioHandler.play();
     await _persistenceService.addToHistory(song);
   }
 

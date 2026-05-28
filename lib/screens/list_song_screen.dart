@@ -36,7 +36,7 @@ class _ListSongScreenState extends ConsumerState<ListSongScreen> {
         physics: const BouncingScrollPhysics(),
         slivers: [
           SliverAppBar(
-            expandedHeight: res.hp(18),
+            expandedHeight: res.hp(16),
             floating: false,
             pinned: true,
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -48,6 +48,7 @@ class _ListSongScreenState extends ConsumerState<ListSongScreen> {
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontSize: res.sp(22),
                       fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
                     ),
               ),
               background: Container(
@@ -56,9 +57,10 @@ class _ListSongScreenState extends ConsumerState<ListSongScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                      Colors.transparent,
+                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                      Theme.of(context).scaffoldBackgroundColor,
                     ],
+                    stops: const [0.0, 1.0],
                   ),
                 ),
               ),
@@ -72,10 +74,15 @@ class _ListSongScreenState extends ConsumerState<ListSongScreen> {
                 children: [
                   Text(
                     '${songs.length} songs available',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: res.sp(14),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   SizedBox(height: res.hp(2)),
                   _buildSearchBar(res),
+                  SizedBox(height: res.hp(1)),
                 ],
               ),
             ),
@@ -92,6 +99,7 @@ class _ListSongScreenState extends ConsumerState<ListSongScreen> {
                   return SongCard(
                     song: filteredSongs[index],
                     playlist: filteredSongs,
+                    index: index,
                   );
                 },
                 childCount: filteredSongs.length,
@@ -108,21 +116,26 @@ class _ListSongScreenState extends ConsumerState<ListSongScreen> {
   Widget _buildSearchBar(Responsive res) {
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(res.wp(3)),
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(res.wp(4)),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline,
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
         ),
       ),
       child: TextField(
         controller: _searchController,
         onChanged: (_) => setState(() {}),
-        style: const TextStyle(color: Colors.white, fontSize: 15),
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: res.sp(15),
+          fontWeight: FontWeight.w500,
+        ),
         decoration: InputDecoration(
           hintText: 'Search songs, artists...',
           hintStyle: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
             fontSize: res.sp(14),
+            fontWeight: FontWeight.w400,
           ),
           prefixIcon: Icon(
             Icons.search_rounded,
@@ -145,7 +158,7 @@ class _ListSongScreenState extends ConsumerState<ListSongScreen> {
           border: InputBorder.none,
           contentPadding: EdgeInsets.symmetric(
             horizontal: res.wp(4),
-            vertical: res.hp(1.5),
+            vertical: res.hp(1.8),
           ),
         ),
       ),

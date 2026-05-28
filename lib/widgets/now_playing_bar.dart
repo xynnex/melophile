@@ -63,48 +63,87 @@ class NowPlayingBar extends ConsumerWidget {
             ),
           ],
         ),
-        child: Row(
+        child: Stack(
           children: [
-            SongArtwork(
-              song: song,
-              size: res.wp(10),
-              borderRadius: res.wp(3),
-            ),
-            SizedBox(width: res.wp(3)),            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                res.wp(3),
+                res.hp(0.8),
+                res.wp(2),
+                res.hp(0.8),
+              ),
+              child: Row(
                 children: [
-                  Text(
-                    song.title,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: res.sp(14),
-                      fontWeight: FontWeight.w600,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  SongArtwork(
+                    song: song,
+                    size: res.wp(10),
+                    borderRadius: res.wp(2.5),
                   ),
-                  SizedBox(height: res.hp(0.3)),
-                  Text(
-                    song.artist,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: res.sp(12),
+                  SizedBox(width: res.wp(3)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          song.title,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.95),
+                            fontSize: res.sp(13.5),
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.1,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: res.hp(0.2)),
+                        Text(
+                          song.artist,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontSize: res.sp(11.5),
+                            fontWeight: FontWeight.w400,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
+                  SizedBox(width: res.wp(2)),
+                  IconButton(
+                    icon: Icon(
+                      playback.isPlaying
+                          ? Icons.pause_circle_filled_rounded
+                          : Icons.play_circle_fill_rounded,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: res.sp(32),
+                    ),
+                    onPressed: () => ref.read(playbackProvider.notifier).togglePlayPause(),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  SizedBox(width: res.wp(1.5)),
                 ],
               ),
             ),
-            IconButton(
-              icon: Icon(
-                playback.isPlaying
-                    ? Icons.pause_circle_filled_rounded
-                    : Icons.play_circle_fill_rounded,
-                color: Theme.of(context).colorScheme.primary,
-                size: res.sp(38),
+            Positioned(
+              bottom: 0,
+              left: res.wp(5),
+              right: res.wp(5),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: playback.duration.inMilliseconds > 0
+                      ? playback.position.inMilliseconds / playback.duration.inMilliseconds
+                      : 0.0,
+                  minHeight: 2.0,
+                  backgroundColor: Colors.transparent,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+                  ),
+                ),
               ),
-              onPressed: () => ref.read(playbackProvider.notifier).togglePlayPause(),
             ),
           ],
         ),
