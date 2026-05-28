@@ -31,9 +31,9 @@ void main() async {
         androidNotificationChannelId: 'com.melophile.melophile.channel.audio',
         androidNotificationChannelName: 'Melophile Playback',
         androidNotificationChannelDescription: 'Music playback controls',
-        androidNotificationOngoing: false, // Set to false to allow StopForegroundOnPause: false
-        androidStopForegroundOnPause: false, // Keep service alive when paused
-        androidNotificationIcon: 'mipmap/ic_launcher',
+        androidNotificationOngoing: false,
+        androidStopForegroundOnPause: false,
+        androidNotificationIcon: 'mipmap/ic_notification',
         androidShowNotificationBadge: true,
         notificationColor: Color(0xFF2E7D32),
       ),
