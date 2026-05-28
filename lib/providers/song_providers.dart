@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:audio_service/audio_service.dart';
 import '../models/song.dart';
 import '../services/music_handler.dart';
 import '../services/file_scanner_service.dart';
@@ -79,17 +80,23 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   }
 
   void _init() {
-    _audioHandler.positionStream.listen((pos) {
-      state = state.copyWith(position: pos);
-    });
-    _audioHandler.durationStream.listen((dur) {
-      state = state.copyWith(duration: dur ?? Duration.zero);
-    });
-    _audioHandler.playerStateStream.listen((playerState) {
-      state = state.copyWith(isPlaying: playerState.playing);
-      if (playerState.processingState == ProcessingState.completed) {
+    _audioHandler.onSkipToNextCall = () => nextSong();
+    _audioHandler.onSkipToPreviousCall = () => previousSong();
+    
+    // Sync with audio handler's playback state
+    _audioHandler.playbackState.listen((playbackState) {
+      state = state.copyWith(
+        isPlaying: playbackState.playing,
+        position: playbackState.updatePosition,
+      );
+      
+      if (playbackState.processingState == AudioProcessingState.completed) {
         _onTrackComplete();
       }
+    });
+
+    _audioHandler.durationStream.listen((dur) {
+      state = state.copyWith(duration: dur ?? Duration.zero);
     });
   }
 
@@ -213,29 +220,31 @@ class SongsNotifier extends StateNotifier<List<Song>> {
 
   Future<void> _init() async {
     try {
-      final songs = _persistence.getSongs();
-      state = songs;
-      _isInitialized = true;
-      debugPrint('SongsNotifier: Initialized with ${state.length} songs');
+      final savedSongs = _persistence.getSongs();
+      if (savedSongs.isNotEmpty) {
+        state = List<Song>.from(savedSongs);
+        debugPrint('SongsNotifier: Successfully loaded ${state.length} songs from Hive');
+      } else {
+        debugPrint('SongsNotifier: No songs found in Hive storage');
+      }
     } catch (e) {
-      debugPrint('SongsNotifier: Init error: $e');
-      _isInitialized = true; // Still mark as initialized to allow recovery
+      debugPrint('SongsNotifier: Critical init error: $e');
+    } finally {
+      _isInitialized = true;
     }
   }
 
   Future<void> scanFolder() async {
-    if (!_isInitialized) {
-      debugPrint('SongsNotifier: Waiting for initialization...');
-      return;
+    while (!_isInitialized) {
+      await Future.delayed(const Duration(milliseconds: 100));
     }
     final newSongs = await _scanner.scanSelectedDirectory();
     await _addUniqueSongs(newSongs);
   }
 
   Future<void> scanDefault() async {
-    if (!_isInitialized) {
-      debugPrint('SongsNotifier: Waiting for initialization...');
-      return;
+    while (!_isInitialized) {
+      await Future.delayed(const Duration(milliseconds: 100));
     }
     final newSongs = await _scanner.scanDefaultDirectories();
     await _addUniqueSongs(newSongs);
@@ -248,11 +257,11 @@ class SongsNotifier extends StateNotifier<List<Song>> {
     final uniqueNew = newSongs.where((s) => !currentPaths.contains(s.filePath)).toList();
     
     if (uniqueNew.isNotEmpty) {
-      debugPrint('SongsNotifier: Adding ${uniqueNew.length} new songs');
-      state = [...state, ...uniqueNew];
+      final updatedList = [...state, ...uniqueNew];
+      state = updatedList;
+      // Save entire library to persist
       await _persistence.saveSongs(state);
-    } else {
-      debugPrint('SongsNotifier: No new unique songs found');
+      debugPrint('SongsNotifier: Library updated and saved. Total: ${state.length}');
     }
   }
 
