@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
@@ -101,10 +100,6 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         isPlaying: playbackState.playing,
         position: playbackState.updatePosition,
       );
-      
-      if (playbackState.processingState == AudioProcessingState.completed) {
-        _onTrackComplete();
-      }
     });
 
     _audioHandler.durationStream.listen((dur) {
@@ -112,24 +107,18 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     });
   }
 
-  void _onTrackComplete() {
-    if (state.repeatMode == RepeatMode.one) {
-      _audioHandler.seek(Duration.zero);
-      _audioHandler.play();
-    } else {
-      nextSong(state.activePlaylist);
-    }
-  }
-
   Future<void> play(Song song, {List<Song>? playlist}) async {
     final list = playlist ?? state.activePlaylist;
+    
+    // Check if playlist is already active and just seek
+    int index = list.indexWhere((s) => s.id == song.id);
+    if (index == -1) index = 0;
+
+    // We still update the local state for immediate UI feedback
     state = state.copyWith(
       currentSong: song,
       activePlaylist: list,
     );
-    
-    int index = list.indexWhere((s) => s.id == song.id);
-    if (index == -1) index = 0;
 
     await _audioHandler.setPlaylist(list, initialIndex: index);
     await _audioHandler.play();
@@ -143,13 +132,30 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   void seek(Duration pos) => _audioHandler.seek(pos);
 
   void toggleShuffle() {
-    state = state.copyWith(isShuffled: !state.isShuffled);
+    final newState = !state.isShuffled;
+    state = state.copyWith(isShuffled: newState);
+    _audioHandler.setShuffleMode(
+      newState ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
+    );
   }
 
   void cycleRepeatMode() {
     final nextMode = RepeatMode.values[(state.repeatMode.index + 1) % RepeatMode.values.length];
     state = state.copyWith(repeatMode: nextMode);
-    _audioHandler.setLoopMode(nextMode == RepeatMode.one ? LoopMode.one : LoopMode.off);
+    
+    LoopMode justAudioMode;
+    switch (nextMode) {
+      case RepeatMode.one:
+        justAudioMode = LoopMode.one;
+        break;
+      case RepeatMode.all:
+        justAudioMode = LoopMode.all;
+        break;
+      case RepeatMode.none:
+        justAudioMode = LoopMode.off;
+        break;
+    }
+    _audioHandler.setLoopMode(justAudioMode);
   }
 
   void setSleepTimer(Duration duration) {
@@ -177,48 +183,16 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     state = state.copyWith(currentSong: null, isPlaying: false);
   }
 
-  void nextSong([List<Song>? songs]) {
-    final list = songs ?? state.activePlaylist;
-    if (list.isEmpty) return;
-    int index = list.indexWhere((s) => s.id == state.currentSong?.id);
-    int nextIndex;
-
-    if (state.isShuffled) {
-      nextIndex = Random().nextInt(list.length);
-    } else {
-      nextIndex = index + 1;
-    }
-
-    if (nextIndex >= list.length) {
-      if (state.repeatMode == RepeatMode.all) {
-        nextIndex = 0;
-      } else {
-        stop();
-        return;
-      }
-    }
-    play(list[nextIndex]);
+  void nextSong() {
+    _audioHandler.skipToNext();
   }
 
-  void previousSong([List<Song>? songs]) {
-    final list = songs ?? state.activePlaylist;
-    if (list.isEmpty) return;
+  void previousSong() {
     if (state.position > const Duration(seconds: 3)) {
       _audioHandler.seek(Duration.zero);
       return;
     }
-
-    int index = list.indexWhere((s) => s.id == state.currentSong?.id);
-    int prevIndex = index - 1;
-
-    if (prevIndex < 0) {
-      if (state.repeatMode == RepeatMode.all) {
-        prevIndex = list.length - 1;
-      } else {
-        prevIndex = 0;
-      }
-    }
-    play(list[prevIndex]);
+    _audioHandler.skipToPrevious();
   }
 }
 
