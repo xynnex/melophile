@@ -10,27 +10,20 @@ class PersistenceService {
   Future<void> saveSongs(List<Song> songs) async {
     try {
       if (!Hive.isBoxOpen('songs')) {
-        debugPrint('PersistenceService.saveSongs: Box "songs" is not open. Cannot save.');
+        debugPrint('PersistenceService.saveSongs: Box "songs" is not open.');
         return;
       }
       
-      final Map<int, Map<String, dynamic>> songsMap = {};
-      final Set<String> processedPaths = {};
+      final List<Map<String, dynamic>> songsList = songs
+          .where((s) => !s.isCorrupted && s.filePath.isNotEmpty)
+          .map((s) => s.toMap())
+          .toList();
 
-      for (var song in songs) {
-        if (song.isCorrupted || song.filePath.isEmpty || processedPaths.contains(song.filePath)) continue;
-        
-        songsMap[song.id] = song.toMap();
-        processedPaths.add(song.filePath);
-      }
-
-      debugPrint('PersistenceService: Saving ${songsMap.length} songs to Hive...');
-      await _songsBox.clear();
-      if (songsMap.isNotEmpty) {
-        await _songsBox.putAll(songsMap);
-        await _songsBox.flush(); // Force write to disk
-      }
-      debugPrint('PersistenceService: Successfully saved songs');
+      debugPrint('PersistenceService: Saving ${songsList.length} songs to Hive as a list...');
+      // Use a single key for the entire list to avoid key range issues
+      await _songsBox.put('library', songsList);
+      await _songsBox.flush();
+      debugPrint('PersistenceService: Library saved successfully');
     } catch (e) {
       debugPrint('PersistenceService.saveSongs error: $e');
     }
@@ -38,25 +31,27 @@ class PersistenceService {
 
   List<Song> getSongs() {
     try {
-      if (!Hive.isBoxOpen('songs')) {
-        debugPrint('PersistenceService.getSongs: Box "songs" is not open');
-        return [];
+      if (!Hive.isBoxOpen('songs')) return [];
+      
+      final dynamic data = _songsBox.get('library');
+      if (data is List) {
+        final List<Song> songs = data
+            .map((item) => Song.fromMap(Map<dynamic, dynamic>.from(item as Map)))
+            .where((s) => s.id != -1)
+            .toList();
+        debugPrint('PersistenceService: Loaded ${songs.length} songs from list');
+        return songs;
       }
       
-      final List<Song> songs = [];
-      final values = _songsBox.values;
-      debugPrint('PersistenceService: Found ${values.length} raw records in Hive');
-
-      for (var value in values) {
-        if (value != null && value is Map) {
+      // Fallback for old format if any
+      final List<Song> oldSongs = [];
+      for (var value in _songsBox.values) {
+        if (value is Map && value.containsKey('filePath')) {
           final song = Song.fromMap(Map<dynamic, dynamic>.from(value));
-          if (song.id != -1) {
-            songs.add(song);
-          }
+          if (song.id != -1) oldSongs.add(song);
         }
       }
-      debugPrint('PersistenceService: Successfully parsed ${songs.length} songs');
-      return songs;
+      return oldSongs;
     } catch (e) {
       debugPrint('PersistenceService.getSongs error: $e');
       return [];
@@ -66,15 +61,24 @@ class PersistenceService {
   Future<void> saveFavorite(Song song) async {
     try {
       if (song.id == -1) return;
-      await _favoritesBox.put(song.id, song.toMap());
+      await _favoritesBox.put(song.filePath, song.toMap());
     } catch (e) {
       debugPrint('PersistenceService.saveFavorite error: $e');
     }
   }
 
   Future<void> removeFavorite(int songId) async {
+    // Note: If we use filePath as key, we should ideally use it here too.
+    // But since favorites box might still use IDs, I'll update it to be consistent.
+    // For now, I'll find by ID if needed, but better to use filePath.
     try {
-      await _favoritesBox.delete(songId);
+      final key = _favoritesBox.keys.firstWhere(
+        (k) => _favoritesBox.get(k)['id'] == songId,
+        orElse: () => null,
+      );
+      if (key != null) {
+        await _favoritesBox.delete(key);
+      }
     } catch (e) {
       debugPrint('PersistenceService.removeFavorite error: $e');
     }
