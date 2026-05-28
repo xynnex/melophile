@@ -186,7 +186,7 @@ class PlayerScreen extends ConsumerWidget {
             'NOW PLAYING',
             style: TextStyle(
               color: Colors.white60,
-              fontSize: res.sp(10),
+              fontSize: res.sp(12),
               letterSpacing: 2,
               fontWeight: FontWeight.bold,
             ),
