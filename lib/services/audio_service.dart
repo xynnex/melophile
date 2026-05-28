@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart';
 import 'package:flutter/foundation.dart';
 import '../models/song.dart';
 
@@ -11,7 +10,6 @@ class AudioService {
   AudioState _state = AudioState.stopped;
   Song? _currentSong;
 
-  // Streams for UI to listen to
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
@@ -28,21 +26,9 @@ class AudioService {
     try {
       _state = AudioState.loading;
       _currentSong = song;
-      
-      final mediaItem = MediaItem(
-        id: song.id.toString(),
-        album: song.album,
-        title: song.title,
-        artist: song.artist,
-        artUri: null, // Artwork bytes are handled differently or passed as URI if possible
-        extras: {'filePath': song.filePath},
-      );
 
       await _player.setAudioSource(
-        AudioSource.uri(
-          Uri.file(song.filePath),
-          tag: mediaItem,
-        ),
+        AudioSource.uri(Uri.file(song.filePath)),
       );
       await _player.play();
       _state = AudioState.playing;
