@@ -4,12 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import '../models/song.dart';
-import '../services/audio_service.dart';
+import '../services/music_handler.dart';
 import '../services/file_scanner_service.dart';
 import '../services/persistence_service.dart';
 
 // 1. Service Providers
-final audioServiceProvider = Provider<AudioPlayerService>((ref) => throw UnimplementedError('Must be overridden in main()'));
+final audioServiceProvider = Provider<MusicHandler>((ref) => throw UnimplementedError('Must be overridden in main()'));
 final fileScannerServiceProvider = Provider((ref) => FileScannerService());
 final persistenceServiceProvider = Provider((ref) => PersistenceService());
 
@@ -70,22 +70,22 @@ enum RepeatMode { none, all, one }
 
 // 3. Playback Notifier
 class PlaybackNotifier extends StateNotifier<PlaybackState> {
-  final AudioPlayerService _audioService;
+  final MusicHandler _audioHandler;
   final PersistenceService _persistenceService;
   Timer? _sleepTimer;
 
-  PlaybackNotifier(this._audioService, this._persistenceService) : super(PlaybackState()) {
+  PlaybackNotifier(this._audioHandler, this._persistenceService) : super(PlaybackState()) {
     _init();
   }
 
   void _init() {
-    _audioService.positionStream.listen((pos) {
+    _audioHandler.positionStream.listen((pos) {
       state = state.copyWith(position: pos);
     });
-    _audioService.durationStream.listen((dur) {
+    _audioHandler.durationStream.listen((dur) {
       state = state.copyWith(duration: dur ?? Duration.zero);
     });
-    _audioService.playerStateStream.listen((playerState) {
+    _audioHandler.playerStateStream.listen((playerState) {
       state = state.copyWith(isPlaying: playerState.playing);
       if (playerState.processingState == ProcessingState.completed) {
         _onTrackComplete();
@@ -95,15 +95,15 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
 
   void _onTrackComplete() {
     if (state.repeatMode == RepeatMode.one) {
-      _audioService.seek(Duration.zero);
-      _audioService.resume();
+      _audioHandler.seek(Duration.zero);
+      _audioHandler.play();
     } else {
       nextSong(state.activePlaylist);
     }
   }
 
   Future<void> play(Song song, {List<Song>? playlist}) async {
-    await _audioService.play(song);
+    await _audioHandler.playSong(song);
     state = state.copyWith(
       currentSong: song,
       activePlaylist: playlist ?? state.activePlaylist,
@@ -112,10 +112,10 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   }
 
   Future<void> togglePlayPause() async {
-    await _audioService.togglePlayPause();
+    await _audioHandler.togglePlayPause();
   }
 
-  void seek(Duration pos) => _audioService.seek(pos);
+  void seek(Duration pos) => _audioHandler.seek(pos);
 
   void toggleShuffle() {
     state = state.copyWith(isShuffled: !state.isShuffled);
@@ -124,7 +124,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   void cycleRepeatMode() {
     final nextMode = RepeatMode.values[(state.repeatMode.index + 1) % RepeatMode.values.length];
     state = state.copyWith(repeatMode: nextMode);
-    _audioService.setLoopMode(nextMode == RepeatMode.one ? LoopMode.one : LoopMode.off);
+    _audioHandler.setLoopMode(nextMode == RepeatMode.one ? LoopMode.one : LoopMode.off);
   }
 
   void setSleepTimer(Duration duration) {
@@ -135,7 +135,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
       if (state.sleepTimerDuration!.inSeconds > 0) {
         state = state.copyWith(sleepTimerDuration: state.sleepTimerDuration! - const Duration(seconds: 1));
       } else {
-        _audioService.stop();
+        _audioHandler.stop();
         cancelSleepTimer();
       }
     });
@@ -148,7 +148,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   }
 
   Future<void> stop() async {
-    await _audioService.stop();
+    await _audioHandler.stop();
     state = state.copyWith(currentSong: null, isPlaying: false);
   }
 
@@ -179,7 +179,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     final list = songs ?? state.activePlaylist;
     if (list.isEmpty) return;
     if (state.position > const Duration(seconds: 3)) {
-      _audioService.seek(Duration.zero);
+      _audioHandler.seek(Duration.zero);
       return;
     }
 

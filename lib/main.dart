@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart';
-import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
+import 'package:audio_service/audio_service.dart';
 import 'app.dart';
 import 'providers/song_providers.dart';
-import 'services/audio_service.dart';
+import 'services/music_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   try {
     await Hive.initFlutter();
     await Hive.openBox('settings');
@@ -23,26 +21,30 @@ void main() async {
     debugPrint(stack.toString());
   }
 
-  final player = AudioPlayer();
-  final oldPlatform = JustAudioPlatform.instance;
+  MusicHandler handler;
 
   try {
-    await JustAudioBackground.init(
-      androidNotificationChannelId: 'com.melophile.melophile.channel.audio',
-      androidNotificationChannelName: 'Melophile Playback',
-      androidNotificationOngoing: true,
-      androidStopForegroundOnPause: false,
+    handler = await AudioService.init<MusicHandler>(
+      builder: () => MusicHandler(),
+      config: AudioServiceConfig(
+        androidNotificationChannelId: 'com.melophile.melophile.channel.audio',
+        androidNotificationChannelName: 'Melophile Playback',
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: false,
+        androidNotificationIcon: 'mipmap/launcher_icon',
+      ),
     );
-    debugPrint('JustAudioBackground initialized with notification support');
-  } catch (e) {
-    JustAudioPlatform.instance = oldPlatform;
-    debugPrint('JustAudioBackground failed (notification disabled): $e');
+    debugPrint('AudioService initialized with notification');
+  } catch (e, stack) {
+    debugPrint('AudioService init failed, using fallback: $e');
+    debugPrint(stack.toString());
+    handler = MusicHandler();
   }
 
   runApp(
     ProviderScope(
       overrides: [
-        audioServiceProvider.overrideWithValue(AudioPlayerService(player)),
+        audioServiceProvider.overrideWithValue(handler),
       ],
       child: const MelophileApp(),
     ),
