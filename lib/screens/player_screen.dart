@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart' hide RepeatMode;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/responsive.dart';
 import '../providers/song_providers.dart';
@@ -390,13 +391,46 @@ class PlayerScreen extends ConsumerWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        IconButton(
-          icon: Icon(
-            playback.isShuffled ? Icons.shuffle_on_rounded : Icons.shuffle_rounded,
-            color: playback.isShuffled ? Theme.of(context).colorScheme.primary : Colors.white38,
-            size: res.sp(26),
-          ),
-          onPressed: () => ref.read(playbackProvider.notifier).toggleShuffle(),
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              icon: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) =>
+                    ScaleTransition(scale: animation, child: child),
+                child: Icon(
+                  playback.isShuffled
+                      ? Icons.shuffle_on_rounded
+                      : Icons.shuffle_rounded,
+                  key: ValueKey(playback.isShuffled),
+                  color: playback.isShuffled
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.white38,
+                  size: res.sp(26),
+                ),
+              ),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                ref.read(playbackProvider.notifier).toggleShuffle();
+              },
+            ),
+            Positioned(
+              bottom: 4,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: playback.isShuffled ? 1.0 : 0.0,
+                child: Container(
+                  width: 4,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
         IconButton(
           icon: const Icon(Icons.skip_previous_rounded, color: Colors.white),
@@ -430,19 +464,52 @@ class PlayerScreen extends ConsumerWidget {
           iconSize: res.sp(40),
           onPressed: () => ref.read(playbackProvider.notifier).nextSong(),
         ),
-        IconButton(
-          icon: Icon(
-            playback.repeatMode == RepeatMode.one
-                ? Icons.repeat_one_on_rounded
-                : playback.repeatMode == RepeatMode.all
-                    ? Icons.repeat_on_rounded
-                    : Icons.repeat_rounded,
-            color: playback.repeatMode != RepeatMode.none
-                ? Theme.of(context).colorScheme.primary
-                : Colors.white38,
-            size: res.sp(26),
-          ),
-          onPressed: () => ref.read(playbackProvider.notifier).cycleRepeatMode(),
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              icon: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: ScaleTransition(scale: animation, child: child),
+                  );
+                },
+                child: Icon(
+                  playback.repeatMode == RepeatMode.one
+                      ? Icons.repeat_one_on_rounded
+                      : playback.repeatMode == RepeatMode.all
+                          ? Icons.repeat_on_rounded
+                          : Icons.repeat_rounded,
+                  key: ValueKey(playback.repeatMode),
+                  color: playback.repeatMode != RepeatMode.none
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.white38,
+                  size: res.sp(26),
+                ),
+              ),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                ref.read(playbackProvider.notifier).cycleRepeatMode();
+              },
+            ),
+            Positioned(
+              bottom: 4,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: playback.repeatMode != RepeatMode.none ? 1.0 : 0.0,
+                child: Container(
+                  width: 4,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
