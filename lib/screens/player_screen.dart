@@ -14,7 +14,6 @@ class PlayerScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final res = Responsive(context);
     final playback = ref.watch(playbackProvider);
-    final songs = ref.watch(songsProvider);
     
     final song = playback.currentSong;
     if (song == null) {
