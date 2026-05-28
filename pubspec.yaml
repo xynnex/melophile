@@ -35,6 +35,8 @@ dependencies:
   file_picker: ^8.0.0
   path_provider: ^2.0.0
   just_audio: ^0.9.40
+  just_audio_background: ^0.0.1-beta.15
+  just_audio_platform_interface: ^4.6.0
   audio_service: ^0.18.18
   permission_handler: ^11.0.0
   audiotags: ^1.1.2
