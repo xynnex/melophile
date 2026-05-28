@@ -1,7 +1,12 @@
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:just_audio/just_audio.dart';
 import 'app.dart';
+import 'providers/song_providers.dart';
+import 'services/audio_service.dart';
+import 'services/music_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,9 +23,32 @@ void main() async {
     debugPrint(stack.toString());
   }
 
+  final player = AudioPlayer();
+  MusicHandler? handler;
+
+  try {
+    handler = MusicHandler(player);
+    await AudioService.init(
+      builder: () => handler!,
+      config: AudioServiceConfig(
+        androidNotificationChannelId: 'com.melophile.melophile.channel.audio',
+        androidNotificationChannelName: 'Melophile Playback',
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: false,
+      ),
+    );
+    debugPrint('AudioService initialized with notification support');
+  } catch (e) {
+    debugPrint('AudioService init failed (notification disabled): $e');
+    handler = null;
+  }
+
   runApp(
-    const ProviderScope(
-      child: MelophileApp(),
+    ProviderScope(
+      overrides: [
+        audioServiceProvider.overrideWithValue(AudioPlayerService(player, handler)),
+      ],
+      child: const MelophileApp(),
     ),
   );
 }

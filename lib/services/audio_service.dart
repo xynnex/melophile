@@ -1,14 +1,19 @@
 import 'dart:async';
+import 'package:audio_service/audio_service.dart' as audio_service;
 import 'package:just_audio/just_audio.dart';
 import 'package:flutter/foundation.dart';
 import '../models/song.dart';
+import 'music_handler.dart';
 
 enum AudioState { stopped, playing, paused, loading, error }
 
-class AudioService {
-  final AudioPlayer _player = AudioPlayer();
+class AudioPlayerService {
+  final AudioPlayer _player;
+  final MusicHandler? _handler;
   AudioState _state = AudioState.stopped;
   Song? _currentSong;
+
+  AudioPlayerService(this._player, this._handler);
 
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
   Stream<Duration> get positionStream => _player.positionStream;
@@ -27,6 +32,15 @@ class AudioService {
       _state = AudioState.loading;
       _currentSong = song;
 
+      _handler?.setMediaItem(audio_service.MediaItem(
+        id: song.id.toString(),
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+        artUri: null,
+        extras: {'filePath': song.filePath},
+      ));
+
       await _player.setAudioSource(
         AudioSource.uri(Uri.file(song.filePath)),
       );
@@ -34,7 +48,7 @@ class AudioService {
       _state = AudioState.playing;
     } catch (e) {
       _state = AudioState.error;
-      debugPrint('AudioService play error: $e');
+      debugPrint('AudioPlayerService play error: $e');
       rethrow;
     }
   }

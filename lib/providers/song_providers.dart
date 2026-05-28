@@ -9,7 +9,7 @@ import '../services/file_scanner_service.dart';
 import '../services/persistence_service.dart';
 
 // 1. Service Providers
-final audioServiceProvider = Provider((ref) => AudioService());
+final audioServiceProvider = Provider<AudioPlayerService>((ref) => throw UnimplementedError('Must be overridden in main()'));
 final fileScannerServiceProvider = Provider((ref) => FileScannerService());
 final persistenceServiceProvider = Provider((ref) => PersistenceService());
 
@@ -70,7 +70,7 @@ enum RepeatMode { none, all, one }
 
 // 3. Playback Notifier
 class PlaybackNotifier extends StateNotifier<PlaybackState> {
-  final AudioService _audioService;
+  final AudioPlayerService _audioService;
   final PersistenceService _persistenceService;
   Timer? _sleepTimer;
 
