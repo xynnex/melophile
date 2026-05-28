@@ -23,14 +23,13 @@ void main() async {
 
     // 2. Secondary Initialization: JustAudioBackground
     // Critical for background playback - keeps foreground service alive
+    // No timeout: partial init leaves _audioHandler unset, causing LateInitializationError on play
     await JustAudioBackground.init(
       androidNotificationChannelId: 'com.melophile.melophile.channel.audio',
       androidNotificationChannelName: 'Melophile Playback',
       androidNotificationOngoing: true,
       androidStopForegroundOnPause: false,
-    ).timeout(const Duration(seconds: 10), onTimeout: () {
-      debugPrint('JustAudioBackground init timed out - continuing app launch');
-    });
+    );
   } catch (e, stack) {
     debugPrint('Critical initialization error: $e');
     debugPrint(stack.toString());
