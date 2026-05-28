@@ -1,33 +1,44 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color _primaryColor = Color(0xFF06B6D4);
-  static const Color _secondaryColor = Color(0xFFF59E0B);
-  static const Color _surfaceColor = Color(0xFF161616);
-  static const Color _backgroundColor = Color(0xFF0D0D0D);
-  static const Color _cardColor = Color(0xFF1E1E1E);
+  // Brand Colors
+  static const Color cyan = Color(0xFF06B6D4);
+  static const Color amber = Color(0xFFF59E0B);
+  
+  // Neutral Colors
+  static const Color background = Color(0xFF0D0D0D);
+  static const Color surface = Color(0xFF161616);
+  static const Color card = Color(0xFF1E1E1E);
 
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      colorScheme: ColorScheme.dark(
-        primary: _primaryColor,
-        secondary: _secondaryColor,
-        surface: _surfaceColor,
-        brightness: Brightness.dark,
+      colorScheme: const ColorScheme.dark(
+        primary: cyan,
+        secondary: amber,
+        surface: surface,
+        onSurface: Colors.white,
+        onSurfaceVariant: Colors.white60,
+        outline: Colors.white10,
       ),
-      scaffoldBackgroundColor: _backgroundColor,
+      scaffoldBackgroundColor: background,
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
+        titleTextStyle: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
       ),
       cardTheme: CardThemeData(
-        color: _cardColor,
+        color: card,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Colors.white10),
         ),
       ),
       textTheme: const TextTheme(
@@ -68,13 +79,7 @@ class AppTheme {
     );
   }
 
-  static List<Color> get gradientColors => [
-    const Color(0xFF06B6D4),
-    const Color(0xFFF59E0B),
-  ];
+  static List<Color> get gradientColors => [cyan, amber];
 
-  static List<Color> get backgroundGradient => [
-    const Color(0xFF0D0D0D),
-    const Color(0xFF1A1A1A),
-  ];
+  static List<Color> get backgroundGradient => [background, const Color(0xFF1A1A1A)];
 }

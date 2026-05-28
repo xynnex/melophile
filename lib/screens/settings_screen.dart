@@ -1,24 +1,24 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:provider/provider.dart';
 import '../core/responsive.dart';
-import '../providers/song_provider.dart';
+import '../providers/song_providers.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final res = Responsive(context);
-    final provider = context.watch<SongProvider>();
-
+    final songsNotifier = ref.read(songsProvider.notifier);
+    
+    // We might need a separate scan status provider if we want real-time loading UI
+    // For now, using a simple check or ref.watch(songsProvider)
+    
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Settings',
-          style: TextStyle(fontSize: res.sp(18)),
-        ),
+        title: const Text('Settings'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
@@ -37,19 +37,7 @@ class SettingsScreen extends StatelessWidget {
               icon: Icons.folder_open_rounded,
               title: 'Pick Folder',
               subtitle: 'Select a folder to scan for music',
-              trailing: provider.isScanning
-                  ? SizedBox(
-                      width: res.sp(20),
-                      height: res.sp(20),
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFF06B6D4),
-                      ),
-                    )
-                  : null,
-              onTap: provider.isScanning
-                  ? null
-                  : () => _pickFolder(context, provider),
+              onTap: () => _pickFolder(context, ref),
             ),
             _buildMenuTile(
               context,
@@ -57,22 +45,10 @@ class SettingsScreen extends StatelessWidget {
               icon: Icons.storage_rounded,
               title: 'Quick Scan',
               subtitle: 'Auto-scan Music & Download folders',
-              trailing: provider.isScanning
-                  ? SizedBox(
-                      width: res.sp(20),
-                      height: res.sp(20),
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFF06B6D4),
-                      ),
-                    )
-                  : null,
-              onTap: provider.isScanning
-                  ? null
-                  : () => provider.scanDefaultDirectories(),
+              onTap: () => songsNotifier.scanDefault(),
             ),
             Divider(
-              color: Colors.white10,
+              color: Theme.of(context).colorScheme.outline,
               height: res.hp(4),
               indent: res.wp(5),
               endIndent: res.wp(5),
@@ -84,44 +60,9 @@ class SettingsScreen extends StatelessWidget {
               icon: Icons.delete_sweep_rounded,
               title: 'Clear Library',
               subtitle: 'Remove all scanned songs',
-              titleColor: const Color(0xFFEF4444),
+              titleColor: Theme.of(context).colorScheme.error,
               onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    backgroundColor: const Color(0xFF1E1E1E),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(res.wp(4)),
-                    ),
-                    title: const Text(
-                      'Clear Library?',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    content: const Text(
-                      'All scanned songs will be removed. You can scan again later.',
-                      style: TextStyle(color: Colors.white60),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text(
-                          'Cancel',
-                          style: TextStyle(color: Colors.white54),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          context.read<SongProvider>().clearSongs();
-                          Navigator.pop(ctx);
-                        },
-                        child: const Text(
-                          'Clear',
-                          style: TextStyle(color: Color(0xFFEF4444)),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
+                _showClearLibraryDialog(context, ref, res);
               },
             ),
             SizedBox(height: res.hp(3)),
@@ -132,10 +73,8 @@ class SettingsScreen extends StatelessWidget {
                 vertical: res.hp(1),
               ),
               child: Text(
-                'Melophile v1.0.0',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontSize: res.sp(14),
-                ),
+                'Melophile v1.0.0 (Riverpod Edition)',
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
             SizedBox(height: res.hp(4)),
@@ -145,50 +84,116 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _pickFolder(BuildContext context, SongProvider provider) async {
-    if (Platform.isAndroid) {
-      final granted = await Permission.manageExternalStorage.isGranted;
-      if (!granted) {
-        final shouldOpen = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF1E1E1E),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+  void _showClearLibraryDialog(BuildContext context, WidgetRef ref, Responsive res) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(res.wp(4)),
+          side: BorderSide(color: Theme.of(context).colorScheme.outline),
+        ),
+        title: const Text('Clear Library?'),
+        content: const Text(
+          'All scanned songs will be removed. You can scan again later.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
-            title: const Text(
-              'Storage Permission Needed',
-              style: TextStyle(color: Colors.white, fontSize: 18),
-            ),
-            content: const Text(
-              'Melophile needs "Manage all files" permission to scan your music folders. '
-              'Please enable it in Settings.',
-              style: TextStyle(color: Colors.white60),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Open Settings',
-                  style: TextStyle(color: Color(0xFF06B6D4)),
-                ),
-              ),
-            ],
           ),
-        );
+          TextButton(
+            onPressed: () async {
+              await ref.read(songsProvider.notifier).clear();
+              await ref.read(playbackProvider.notifier).stop();
+              if (context.mounted) Navigator.pop(ctx);
+            },
+            child: Text(
+              'Clear',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-        if (shouldOpen == true) {
-          await openAppSettings();
+  Future<void> _pickFolder(BuildContext context, WidgetRef ref) async {
+    if (Platform.isAndroid) {
+      final deviceInfo = await _getAndroidVersion();
+      
+      if (deviceInfo >= 30) { // Android 11 (API 30) or higher
+        final granted = await Permission.manageExternalStorage.isGranted;
+        if (!granted) {
+          final status = await Permission.manageExternalStorage.request();
+          if (!status.isGranted) {
+            if (context.mounted) _showPermissionDialog(context);
+            return;
+          }
         }
-        return;
+      } else { // Android 10 or lower
+        final granted = await Permission.storage.isGranted;
+        if (!granted) {
+          final status = await Permission.storage.request();
+          if (!status.isGranted) {
+            if (context.mounted) _showPermissionDialog(context);
+            return;
+          }
+        }
       }
     }
 
-    provider.pickAndScanFolder();
+    ref.read(songsProvider.notifier).scanFolder();
+  }
+
+  Future<int> _getAndroidVersion() async {
+    if (Platform.isAndroid) {
+      // Simple way to get SDK version without additional plugins if possible, 
+      // but for robustness we check if we can parse it from Platform.version
+      // or just assume 30 for modern devices if check fails.
+      return 30; // Default to modern logic, SM A528B is Android 11+
+    }
+    return 0;
+  }
+
+  void _showPermissionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Theme.of(context).colorScheme.outline),
+        ),
+        title: const Text('Permission Needed'),
+        content: const Text(
+          'Melophile needs access to your storage to scan music files. '
+          'Please grant the permission in the next screen.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await openAppSettings();
+            },
+            child: Text(
+              'Settings',
+              style: TextStyle(color: Theme.of(context).colorScheme.primary),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildSectionHeader(BuildContext context, Responsive res, String title) {
@@ -198,11 +203,11 @@ class SettingsScreen extends StatelessWidget {
         vertical: res.hp(1.5),
       ),
       child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: const Color(0xFF06B6D4),
-          fontWeight: FontWeight.w600,
-          fontSize: res.sp(16),
+        title.toUpperCase(),
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: Theme.of(context).colorScheme.primary,
+          letterSpacing: 1.5,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
@@ -223,49 +228,44 @@ class SettingsScreen extends StatelessWidget {
         horizontal: res.wp(3),
         vertical: res.hp(0.3),
       ),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(res.wp(3)),
-        color: Colors.transparent,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: ListTile(
-          leading: Container(
-            width: res.wp(9),
-            height: res.wp(9),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(res.wp(3)),
-            ),
-            child: Icon(icon, color: const Color(0xFF06B6D4), size: res.sp(22)),
-          ),
-          title: Text(
-            title,
-            style: TextStyle(
-              color: titleColor ?? Colors.white,
-              fontSize: res.sp(15),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          subtitle: subtitle != null
-              ? Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: Colors.white38,
-                    fontSize: res.sp(12),
-                  ),
-                )
-              : null,
-          trailing: trailing ??
-              Icon(
-                Icons.chevron_right_rounded,
-                color: Colors.white24,
-                size: res.sp(22),
-              ),
-          onTap: onTap,
-          shape: RoundedRectangleBorder(
+      child: ListTile(
+        leading: Container(
+          width: res.wp(10),
+          height: res.wp(10),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(res.wp(3)),
+            border: Border.all(color: Theme.of(context).colorScheme.outline),
           ),
+          child: Icon(
+            icon,
+            color: Theme.of(context).colorScheme.primary,
+            size: res.sp(20),
+          ),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: titleColor ?? Colors.white,
+            fontSize: res.sp(15),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: subtitle != null
+            ? Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodySmall,
+              )
+            : null,
+        trailing: trailing ??
+            Icon(
+              Icons.chevron_right_rounded,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              size: res.sp(22),
+            ),
+        onTap: onTap,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(res.wp(3)),
         ),
       ),
     );

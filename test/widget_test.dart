@@ -1,16 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:melophile/app.dart';
-import 'package:melophile/providers/song_provider.dart';
 
 void main() {
-  testWidgets('App renders with Melophile title', (WidgetTester tester) async {
+  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
     await tester.pumpWidget(
-      ChangeNotifierProvider(
-        create: (_) => SongProvider(),
-        child: const MelophileApp(),
+      const ProviderScope(
+        child: MelophileApp(),
       ),
     );
-    expect(find.text('Melophile'), findsNothing);
+
+    // Verify that our app starts.
+    expect(find.byType(MelophileApp), findsOneWidget);
   });
 }

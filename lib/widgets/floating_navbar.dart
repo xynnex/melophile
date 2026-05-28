@@ -42,9 +42,9 @@ class FloatingNavbar extends StatelessWidget {
               vertical: res.hp(1),
             ),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E).withValues(alpha: 0.95),
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.1),
+                color: Theme.of(context).colorScheme.outline,
               ),
               borderRadius: BorderRadius.circular(res.wp(6)),
             ),
@@ -109,7 +109,7 @@ class _NavItem extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF06B6D4).withValues(alpha: 0.15)
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(res.wp(4)),
         ),
@@ -118,14 +118,14 @@ class _NavItem extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color: isSelected ? const Color(0xFF06B6D4) : Colors.white38,
+              color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurfaceVariant,
               size: res.sp(24),
             ),
             SizedBox(height: res.hp(0.5)),
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? const Color(0xFF06B6D4) : Colors.white38,
+                color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: res.sp(11),
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               ),

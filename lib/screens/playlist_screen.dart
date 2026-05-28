@@ -1,69 +1,93 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/responsive.dart';
-import '../providers/song_provider.dart';
+import '../providers/song_providers.dart';
 
-class PlaylistScreen extends StatelessWidget {
+class PlaylistScreen extends ConsumerWidget {
   const PlaylistScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final res = Responsive(context);
-    final provider = context.watch<SongProvider>();
+    final songs = ref.watch(songsProvider);
+    final favorites = ref.watch(favoritesProvider);
+    final history = ref.watch(historyProvider);
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: res.wp(5)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: res.hp(4)),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Your Playlists',
-                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    fontSize: res.sp(28),
+    return Scaffold(
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverAppBar(
+            expandedHeight: res.hp(18),
+            floating: false,
+            pinned: true,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            actions: [
+              Padding(
+                padding: EdgeInsets.only(right: res.wp(5)),
+                child: IconButton.filledTonal(
+                  onPressed: () {},
+                  icon: const Icon(Icons.add_rounded),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    foregroundColor: Theme.of(context).colorScheme.primary,
                   ),
                 ),
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF06B6D4),
-                    borderRadius: BorderRadius.circular(res.wp(3)),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.add_rounded, color: Colors.white),
-                    iconSize: res.sp(22),
-                    onPressed: () {},
+              ),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding: EdgeInsets.only(left: res.wp(5), bottom: 16),
+              centerTitle: false,
+              title: Text(
+                'Your Playlists',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontSize: res.sp(22),
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                      Colors.transparent,
+                    ],
                   ),
                 ),
-              ],
-            ),
-            SizedBox(height: res.hp(1)),
-            Text(
-              '${provider.songs.length} songs in library',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontSize: res.sp(14),
               ),
             ),
-            SizedBox(height: res.hp(3)),
-            _buildPlaylistGrid(context, res, provider),
-            SizedBox(height: res.hp(4)),
-          ],
-        ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: res.wp(5)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${songs.length} songs in library',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  SizedBox(height: res.hp(3)),
+                  _buildPlaylistGrid(context, res, ref, songs.length, favorites.length, history.length),
+                  SizedBox(height: res.hp(22)), // Space for NowPlayingBar
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildPlaylistGrid(BuildContext context, Responsive res, SongProvider provider) {
+  Widget _buildPlaylistGrid(BuildContext context, Responsive res, WidgetRef ref, int totalSongs, int totalFavs, int totalHistory) {
     final crossAxisCount = res.gridCrossAxisCount().toInt();
 
     final playlists = [
-      _PlaylistData('Favorites', provider.favorites.length, Icons.favorite_rounded, const Color(0xFFF59E0B)),
-      _PlaylistData('Recently Played', provider.recentHistory.length, Icons.history_rounded, const Color(0xFF06B6D4)),
-      _PlaylistData('All Songs', provider.songs.length, Icons.library_music_rounded, const Color(0xFF6366F1)),
+      _PlaylistData('Favorites', totalFavs, Icons.favorite_rounded, Theme.of(context).colorScheme.secondary),
+      _PlaylistData('Recently Played', totalHistory, Icons.history_rounded, Theme.of(context).colorScheme.primary),
+      _PlaylistData('All Songs', totalSongs, Icons.library_music_rounded, const Color(0xFF6366F1)),
       _PlaylistData('Chill Vibes', 0, Icons.waves_rounded, const Color(0xFF34D399)),
     ];
 
@@ -105,9 +129,9 @@ class _PlaylistCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(res.wp(4)),
-        color: const Color(0xFF1E1E1E),
+        color: Theme.of(context).colorScheme.surface,
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.06),
+          color: Theme.of(context).colorScheme.outline,
         ),
       ),
       child: Material(
@@ -124,7 +148,7 @@ class _PlaylistCard extends StatelessWidget {
                   width: res.wp(10),
                   height: res.wp(10),
                   decoration: BoxDecoration(
-                    color: playlist.color.withValues(alpha: 0.2),
+                    color: playlist.color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(res.wp(3)),
                   ),
                   child: Icon(
@@ -136,19 +160,18 @@ class _PlaylistCard extends StatelessWidget {
                 const Spacer(),
                 Text(
                   playlist.name,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: res.sp(15),
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: res.sp(15),
+                      ),
                 ),
                 SizedBox(height: res.hp(0.5)),
                 Text(
                   '${playlist.songCount} songs',
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontSize: res.sp(12),
-                  ),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontSize: res.sp(12),
+                      ),
                 ),
               ],
             ),

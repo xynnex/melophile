@@ -1,61 +1,62 @@
+import 'dart:ui';
 import 'package:flutter/material.dart' hide RepeatMode;
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/responsive.dart';
-import '../providers/song_provider.dart';
+import '../providers/song_providers.dart';
+import '../models/song.dart';
+import '../widgets/song_artwork.dart';
 
-class PlayerScreen extends StatelessWidget {
+class PlayerScreen extends ConsumerWidget {
   const PlayerScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final res = Responsive(context);
+    final playback = ref.watch(playbackProvider);
+    final songs = ref.watch(songsProvider);
+    
+    final song = playback.currentSong;
+    if (song == null) {
+      return const Scaffold(
+        body: Center(child: Text('No song selected')),
+      );
+    }
 
-    return Consumer<SongProvider>(
-      builder: (context, provider, _) {
-        final song = provider.currentSong;
-        if (song == null) {
-          return const Scaffold(
-            body: Center(child: Text('No song selected')),
-          );
-        }
+    final pos = playback.position;
+    final dur = playback.duration;
+    final posStr = _fmt(pos);
+    final durStr = _fmt(dur);
+    final progress = dur.inMilliseconds > 0
+        ? pos.inMilliseconds / dur.inMilliseconds
+        : 0.0;
 
-        final pos = provider.position;
-        final dur = provider.duration;
-        final posStr = _fmt(pos);
-        final durStr = _fmt(dur);
-        final progress = dur.inMilliseconds > 0
-            ? pos.inMilliseconds / dur.inMilliseconds
-            : 0.0;
-
-        return Scaffold(
-          body: Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF0D0D0D),
-                  Color(0xFF111122),
-                  Color(0xFF0D0D0D),
-                ],
-              ),
-            ),
-            child: SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isLandscape = constraints.maxWidth > constraints.maxHeight;
-                  if (isLandscape && res.isTablet) {
-                    return _buildLandscape(context, res, provider, song, posStr, durStr, progress);
-                  }
-                  return _buildPortrait(context, res, provider, song, posStr, durStr, progress);
-                },
-              ),
+    return Scaffold(
+      body: Stack(
+        children: [
+          // 1. Dynamic Background
+          _buildDynamicBackground(song),
+          
+          // 2. Main Content
+          SafeArea(
+            child: Column(
+              children: [
+                _buildAppBar(context, res, playback, ref),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isLandscape = constraints.maxWidth > constraints.maxHeight;
+                      if (isLandscape && res.isTablet) {
+                        return _buildLandscape(context, res, playback, ref, song, posStr, durStr, progress);
+                      }
+                      return _buildPortrait(context, res, playback, ref, song, posStr, durStr, progress);
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -65,133 +66,262 @@ class PlayerScreen extends StatelessWidget {
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  Widget _buildPortrait(BuildContext context, Responsive res, SongProvider provider,
-      dynamic song, String posStr, String durStr, double progress) {
-    final artSize = res.wp(55).clamp(180.0, 320.0);
-
-    return Column(
+  Widget _buildDynamicBackground(Song song) {
+    return Stack(
       children: [
-        _buildAppBar(context, res, provider),
-        const Spacer(flex: 1),
-        _buildAlbumArt(artSize, res, provider),
-        const Spacer(flex: 2),
-        _buildSongInfo(context, res, song),
-        SizedBox(height: res.hp(3)),
-        _buildProgress(posStr, durStr, progress, provider, res),
-        SizedBox(height: res.hp(3)),
-        _buildControls(context, provider, res),
-        SizedBox(height: res.hp(2)),
-        _buildVolumeSlider(provider, res),
-        const Spacer(flex: 1),
+        Container(color: Colors.black),
+        Positioned.fill(
+          child: SongArtwork(
+            song: song,
+            size: double.infinity,
+            borderRadius: 0,
+          ),
+        ),
+        Positioned.fill(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.6),
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildLandscape(BuildContext context, Responsive res, SongProvider provider,
-      dynamic song, String posStr, String durStr, double progress) {
-    final artSize = res.hp(35).clamp(120.0, 240.0);
+  Widget _buildPortrait(BuildContext context, Responsive res, PlaybackState playback, WidgetRef ref,
+      Song song, String posStr, String durStr, double progress) {
+    final artSize = res.wp(75).clamp(200.0, 350.0);
+
+    return Column(
+      children: [
+        const Spacer(),
+        _buildAlbumArt(artSize, res, song),
+        const Spacer(),
+        _buildSongInfo(context, res, song),
+        SizedBox(height: res.hp(4)),
+        _buildProgress(context, posStr, durStr, progress, playback, ref, res),
+        SizedBox(height: res.hp(4)),
+        _buildControls(context, playback, ref, res),
+        const Spacer(),
+      ],
+    );
+  }
+
+  Widget _buildLandscape(BuildContext context, Responsive res, PlaybackState playback, WidgetRef ref,
+      Song song, String posStr, String durStr, double progress) {
+    final artSize = res.hp(60).clamp(150.0, 300.0);
 
     return Row(
       children: [
-        SizedBox(width: res.wp(5)),
-        _buildAlbumArt(artSize, res, provider),
-        SizedBox(width: res.wp(5)),
+        SizedBox(width: res.wp(10)),
+        _buildAlbumArt(artSize, res, song),
+        SizedBox(width: res.wp(8)),
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _buildSongInfo(context, res, song),
               SizedBox(height: res.hp(2)),
-              _buildProgress(posStr, durStr, progress, provider, res),
+              _buildProgress(context, posStr, durStr, progress, playback, ref, res),
               SizedBox(height: res.hp(2)),
-              _buildControls(context, provider, res),
-              SizedBox(height: res.hp(2)),
-              _buildVolumeSlider(provider, res),
+              _buildControls(context, playback, ref, res),
             ],
           ),
         ),
-        SizedBox(width: res.wp(5)),
+        SizedBox(width: res.wp(10)),
       ],
     );
   }
 
-  Widget _buildAppBar(BuildContext context, Responsive res, SongProvider provider) {
+  Widget _buildAppBar(BuildContext context, Responsive res, PlaybackState playback, WidgetRef ref) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: res.wp(2), vertical: res.hp(0.5)),
+      padding: EdgeInsets.symmetric(horizontal: res.wp(2), vertical: res.hp(1)),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
             icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white),
-            iconSize: res.sp(28),
+            iconSize: res.sp(32),
             onPressed: () => Navigator.pop(context),
           ),
-          const Spacer(),
-          if (provider.currentSong != null)
-            IconButton(
-              icon: Icon(
-                provider.isFavorite(provider.currentSong!)
-                    ? Icons.favorite_rounded
-                    : Icons.favorite_outline_rounded,
-                color: provider.isFavorite(provider.currentSong!)
-                    ? const Color(0xFFF59E0B)
-                    : Colors.white38,
-              ),
-              iconSize: res.sp(24),
-              onPressed: () {
-                if (provider.currentSong != null) {
-                  provider.toggleFavorite(provider.currentSong!);
-                }
-              },
+          Text(
+            'NOW PLAYING',
+            style: TextStyle(
+              color: Colors.white60,
+              fontSize: res.sp(10),
+              letterSpacing: 2,
+              fontWeight: FontWeight.bold,
             ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: () => _showSleepTimerDialog(context, playback, ref, res),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: res.wp(2.5), vertical: res.hp(0.6)),
+                  decoration: BoxDecoration(
+                    color: playback.isSleepTimerActive 
+                        ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                        : Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(res.wp(4)),
+                    border: Border.all(
+                      color: playback.isSleepTimerActive 
+                          ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
+                          : Colors.white10,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        playback.isSleepTimerActive ? Icons.timer_rounded : Icons.timer_outlined,
+                        color: playback.isSleepTimerActive 
+                            ? Theme.of(context).colorScheme.primary 
+                            : Colors.white60,
+                        size: res.sp(14),
+                      ),
+                      if (playback.isSleepTimerActive) ...[
+                        SizedBox(width: res.wp(1)),
+                        Text(
+                          _formatDurationShort(playback.sleepTimerDuration!),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontSize: res.sp(11),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(width: res.wp(1)),
+              IconButton(
+                icon: Icon(
+                  ref.watch(favoritesProvider).any((s) => s.id == playback.currentSong?.id)
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_outline_rounded,
+                  color: ref.watch(favoritesProvider).any((s) => s.id == playback.currentSong?.id)
+                      ? Theme.of(context).colorScheme.secondary
+                      : Colors.white38,
+                ),
+                iconSize: res.sp(24),
+                onPressed: () {
+                  if (playback.currentSong != null) {
+                    ref.read(favoritesProvider.notifier).toggle(playback.currentSong!);
+                  }
+                },
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildAlbumArt(double size, Responsive res, SongProvider provider) {
-    final isPlaying = provider.isPlaying;
+  String _formatDurationShort(Duration d) {
+    final m = d.inMinutes;
+    final s = d.inSeconds.remainder(60);
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
 
-    return GestureDetector(
-      onTap: () => provider.togglePlayPause(),
-      child: Container(
-        width: size,
-        height: size,
+  void _showSleepTimerDialog(BuildContext context, PlaybackState playback, WidgetRef ref, Responsive res) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.all(res.wp(6)),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(size * 0.18),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF06B6D4), Color(0xFFF59E0B)],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF06B6D4).withValues(alpha: 0.3),
-              blurRadius: size * 0.15,
-              offset: Offset(0, size * 0.04),
-            ),
-          ],
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: Center(
-          child: Icon(
-            isPlaying ? Icons.equalizer_rounded : Icons.play_arrow_rounded,
-            color: Colors.white,
-            size: size * 0.3,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Sleep Timer',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            if (playback.isSleepTimerActive) ...[
+              SizedBox(height: res.hp(2)),
+              Text(
+                'Remaining: ${_formatDuration(playback.sleepTimerDuration!)}',
+                style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w600),
+              ),
+              SizedBox(height: res.hp(3)),
+              ElevatedButton(
+                onPressed: () {
+                  ref.read(playbackProvider.notifier).cancelSleepTimer();
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                  minimumSize: Size(double.infinity, res.hp(6)),
+                ),
+                child: const Text('Stop Timer'),
+              ),
+            ] else ...[
+              SizedBox(height: res.hp(3)),
+              Wrap(
+                spacing: res.wp(3),
+                runSpacing: res.hp(2),
+                alignment: WrapAlignment.center,
+                children: [15, 30, 45, 60].map((mins) => ActionChip(
+                  label: Text('$mins mins'),
+                  onPressed: () {
+                    ref.read(playbackProvider.notifier).setSleepTimer(Duration(minutes: mins));
+                    Navigator.pop(context);
+                  },
+                )).toList(),
+              ),
+            ],
+            SizedBox(height: res.hp(4)),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildSongInfo(BuildContext context, Responsive res, dynamic song) {
+  String _formatDuration(Duration d) {
+    final m = d.inMinutes;
+    final s = d.inSeconds.remainder(60);
+    return '${m}m ${s.toString().padLeft(2, '0')}s';
+  }
+
+  Widget _buildAlbumArt(double size, Responsive res, Song song) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(res.wp(8)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.5),
+            blurRadius: 30,
+            offset: const Offset(0, 15),
+          ),
+        ],
+      ),
+      child: SongArtwork(
+        song: song,
+        size: size,
+        borderRadius: res.wp(8),
+      ),
+    );
+  }
+
+  Widget _buildSongInfo(BuildContext context, Responsive res, Song song) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: res.wp(8)),
+      padding: EdgeInsets.symmetric(horizontal: res.wp(10)),
       child: Column(
         children: [
           Text(
             song.title,
             style: TextStyle(
               color: Colors.white,
-              fontSize: res.sp(24),
+              fontSize: res.sp(26),
               fontWeight: FontWeight.bold,
             ),
             textAlign: TextAlign.center,
@@ -202,8 +332,9 @@ class PlayerScreen extends StatelessWidget {
           Text(
             song.artist,
             style: TextStyle(
-              color: Colors.white54,
-              fontSize: res.sp(16),
+              color: Theme.of(context).colorScheme.primary,
+              fontSize: res.sp(18),
+              fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
@@ -214,32 +345,32 @@ class PlayerScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProgress(String pos, String dur, double progress,
-      SongProvider provider, Responsive res) {
+  Widget _buildProgress(BuildContext context, String pos, String dur, double progress,
+      PlaybackState playback, WidgetRef ref, Responsive res) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: res.wp(8)),
       child: Column(
         children: [
           SliderTheme(
             data: SliderThemeData(
-              trackHeight: 3,
+              trackHeight: 4,
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-              activeTrackColor: const Color(0xFF06B6D4),
-              inactiveTrackColor: Colors.white10,
-              thumbColor: const Color(0xFF06B6D4),
-              overlayColor: const Color(0xFF06B6D4).withValues(alpha: 0.2),
+              activeTrackColor: Theme.of(context).colorScheme.primary,
+              inactiveTrackColor: Colors.white12,
+              thumbColor: Colors.white,
+              overlayColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
             ),
             child: Slider(
               value: progress.clamp(0.0, 1.0),
               onChanged: (v) {
-                final totalMs = provider.duration.inMilliseconds;
-                provider.seek(Duration(milliseconds: (totalMs * v).toInt()));
+                final totalMs = playback.duration.inMilliseconds;
+                ref.read(playbackProvider.notifier).seek(Duration(milliseconds: (totalMs * v).toInt()));
               },
             ),
           ),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: res.wp(1)),
+            padding: EdgeInsets.symmetric(horizontal: res.wp(2)),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -253,112 +384,67 @@ class PlayerScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildControls(BuildContext context, SongProvider provider, Responsive res) {
-    final btnSize = res.wp(12).clamp(40.0, 64.0);
+  Widget _buildControls(BuildContext context, PlaybackState playback, WidgetRef ref, Responsive res) {
+    final btnSize = res.wp(18).clamp(60.0, 80.0);
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         IconButton(
           icon: Icon(
-            provider.isShuffled ? Icons.shuffle_on_rounded : Icons.shuffle_rounded,
-            color: provider.isShuffled ? const Color(0xFF06B6D4) : Colors.white38,
-            size: res.sp(24),
+            playback.isShuffled ? Icons.shuffle_on_rounded : Icons.shuffle_rounded,
+            color: playback.isShuffled ? Theme.of(context).colorScheme.primary : Colors.white38,
+            size: res.sp(26),
           ),
-          onPressed: () => provider.toggleShuffle(),
+          onPressed: () => ref.read(playbackProvider.notifier).toggleShuffle(),
         ),
-        SizedBox(width: res.wp(3)),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white10,
-            borderRadius: BorderRadius.circular(btnSize * 0.25),
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.skip_previous_rounded, color: Colors.white),
-            iconSize: res.sp(30),
-            onPressed: () => provider.previousSong(),
-          ),
+        IconButton(
+          icon: const Icon(Icons.skip_previous_rounded, color: Colors.white),
+          iconSize: res.sp(40),
+          onPressed: () => ref.read(playbackProvider.notifier).previousSong(),
         ),
-        SizedBox(width: res.wp(3)),
         Container(
           width: btnSize,
           height: btnSize,
           decoration: BoxDecoration(
-            color: const Color(0xFF06B6D4),
-            borderRadius: BorderRadius.circular(btnSize * 0.5),
+            color: Colors.white,
+            shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF06B6D4).withValues(alpha: 0.4),
-                blurRadius: btnSize * 0.25,
+                color: Colors.white.withValues(alpha: 0.2),
+                blurRadius: 20,
               ),
             ],
           ),
           child: IconButton(
             icon: Icon(
-              provider.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              color: Colors.white,
+              playback.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              color: Colors.black,
             ),
-            iconSize: res.sp(34),
-            onPressed: () => provider.togglePlayPause(),
+            iconSize: res.sp(40),
+            onPressed: () => ref.read(playbackProvider.notifier).togglePlayPause(),
           ),
         ),
-        SizedBox(width: res.wp(3)),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white10,
-            borderRadius: BorderRadius.circular(btnSize * 0.25),
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.skip_next_rounded, color: Colors.white),
-            iconSize: res.sp(30),
-            onPressed: () => provider.nextSong(),
-          ),
+        IconButton(
+          icon: const Icon(Icons.skip_next_rounded, color: Colors.white),
+          iconSize: res.sp(40),
+          onPressed: () => ref.read(playbackProvider.notifier).nextSong(),
         ),
-        SizedBox(width: res.wp(3)),
         IconButton(
           icon: Icon(
-            provider.repeatMode == RepeatMode.one
+            playback.repeatMode == RepeatMode.one
                 ? Icons.repeat_one_on_rounded
-                : provider.repeatMode == RepeatMode.all
+                : playback.repeatMode == RepeatMode.all
                     ? Icons.repeat_on_rounded
                     : Icons.repeat_rounded,
-            color: provider.repeatMode != RepeatMode.none
-                ? const Color(0xFF06B6D4)
+            color: playback.repeatMode != RepeatMode.none
+                ? Theme.of(context).colorScheme.primary
                 : Colors.white38,
-            size: res.sp(24),
+            size: res.sp(26),
           ),
-          onPressed: () => provider.cycleRepeatMode(),
+          onPressed: () => ref.read(playbackProvider.notifier).cycleRepeatMode(),
         ),
       ],
-    );
-  }
-
-  Widget _buildVolumeSlider(SongProvider provider, Responsive res) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: res.wp(12)),
-      child: Row(
-        children: [
-          Icon(Icons.volume_down_rounded, color: Colors.white38, size: res.sp(18)),
-          Expanded(
-            child: SliderTheme(
-              data: SliderThemeData(
-                trackHeight: 2,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                activeTrackColor: Colors.white38,
-                inactiveTrackColor: Colors.white10,
-                thumbColor: Colors.white54,
-                overlayColor: Colors.white.withValues(alpha: 0.1),
-              ),
-              child: Slider(
-                value: provider.volume,
-                onChanged: (v) => provider.setVolume(v),
-              ),
-            ),
-          ),
-          Icon(Icons.volume_up_rounded, color: Colors.white38, size: res.sp(18)),
-        ],
-      ),
     );
   }
 }
