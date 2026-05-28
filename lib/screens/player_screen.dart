@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart' hide RepeatMode;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/responsive.dart';
 import '../providers/song_providers.dart';
@@ -13,7 +14,6 @@ class PlayerScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final res = Responsive(context);
     final playback = ref.watch(playbackProvider);
-    final songs = ref.watch(songsProvider);
     
     final song = playback.currentSong;
     if (song == null) {
@@ -92,14 +92,32 @@ class PlayerScreen extends ConsumerWidget {
   Widget _buildPortrait(BuildContext context, Responsive res, PlaybackState playback, WidgetRef ref,
       Song song, String posStr, String durStr, double progress) {
     final artSize = res.wp(75).clamp(200.0, 350.0);
+    final isFav = ref.watch(favoritesProvider).any((s) => s.id == song.id);
 
     return Column(
       children: [
         const Spacer(),
         _buildAlbumArt(artSize, res, song),
         const Spacer(),
-        _buildSongInfo(context, res, song),
-        SizedBox(height: res.hp(4)),
+        _buildSongInfo(context, res, song, ref),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: res.wp(8)),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: IconButton(
+              icon: Icon(
+                isFav ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
+                color: isFav ? Theme.of(context).colorScheme.primary : Colors.white38,
+              ),
+              iconSize: res.sp(28),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                ref.read(favoritesProvider.notifier).toggle(song);
+              },
+            ),
+          ),
+        ),
+        SizedBox(height: res.hp(1)),
         _buildProgress(context, posStr, durStr, progress, playback, ref, res),
         SizedBox(height: res.hp(4)),
         _buildControls(context, playback, ref, res),
@@ -111,6 +129,7 @@ class PlayerScreen extends ConsumerWidget {
   Widget _buildLandscape(BuildContext context, Responsive res, PlaybackState playback, WidgetRef ref,
       Song song, String posStr, String durStr, double progress) {
     final artSize = res.hp(60).clamp(150.0, 300.0);
+    final isFav = ref.watch(favoritesProvider).any((s) => s.id == song.id);
 
     return Row(
       children: [
@@ -121,8 +140,25 @@ class PlayerScreen extends ConsumerWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildSongInfo(context, res, song),
-              SizedBox(height: res.hp(2)),
+              _buildSongInfo(context, res, song, ref),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: EdgeInsets.only(right: res.wp(8)),
+                  child: IconButton(
+                    icon: Icon(
+                      isFav ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
+                      color: isFav ? Theme.of(context).colorScheme.primary : Colors.white38,
+                    ),
+                    iconSize: res.sp(28),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      ref.read(favoritesProvider.notifier).toggle(song);
+                    },
+                  ),
+                ),
+              ),
+              SizedBox(height: res.hp(1)),
               _buildProgress(context, posStr, durStr, progress, playback, ref, res),
               SizedBox(height: res.hp(2)),
               _buildControls(context, playback, ref, res),
@@ -149,7 +185,7 @@ class PlayerScreen extends ConsumerWidget {
             'NOW PLAYING',
             style: TextStyle(
               color: Colors.white60,
-              fontSize: res.sp(10),
+              fontSize: res.sp(12),
               letterSpacing: 2,
               fontWeight: FontWeight.bold,
             ),
@@ -196,23 +232,6 @@ class PlayerScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-              SizedBox(width: res.wp(1)),
-              IconButton(
-                icon: Icon(
-                  ref.watch(favoritesProvider).any((s) => s.id == playback.currentSong?.id)
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_outline_rounded,
-                  color: ref.watch(favoritesProvider).any((s) => s.id == playback.currentSong?.id)
-                      ? Theme.of(context).colorScheme.secondary
-                      : Colors.white38,
-                ),
-                iconSize: res.sp(24),
-                onPressed: () {
-                  if (playback.currentSong != null) {
-                    ref.read(favoritesProvider.notifier).toggle(playback.currentSong!);
-                  }
-                },
-              ),
             ],
           ),
         ],
@@ -227,59 +246,148 @@ class PlayerScreen extends ConsumerWidget {
   }
 
   void _showSleepTimerDialog(BuildContext context, PlaybackState playback, WidgetRef ref, Responsive res) {
+    double customMinutes = 30;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.all(res.wp(6)),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Sleep Timer',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return Container(
+            padding: EdgeInsets.only(
+              left: res.wp(6),
+              right: res.wp(6),
+              top: res.wp(6),
+              bottom: res.hp(4) + MediaQuery.of(context).viewInsets.bottom,
             ),
-            if (playback.isSleepTimerActive) ...[
-              SizedBox(height: res.hp(2)),
-              Text(
-                'Remaining: ${_formatDuration(playback.sleepTimerDuration!)}',
-                style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w600),
-              ),
-              SizedBox(height: res.hp(3)),
-              ElevatedButton(
-                onPressed: () {
-                  ref.read(playbackProvider.notifier).cancelSleepTimer();
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                  foregroundColor: Theme.of(context).colorScheme.error,
-                  minimumSize: Size(double.infinity, res.hp(6)),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: res.wp(12),
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white12,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-                child: const Text('Stop Timer'),
-              ),
-            ] else ...[
-              SizedBox(height: res.hp(3)),
-              Wrap(
-                spacing: res.wp(3),
-                runSpacing: res.hp(2),
-                alignment: WrapAlignment.center,
-                children: [15, 30, 45, 60].map((mins) => ActionChip(
-                  label: Text('$mins mins'),
-                  onPressed: () {
-                    ref.read(playbackProvider.notifier).setSleepTimer(Duration(minutes: mins));
-                    Navigator.pop(context);
-                  },
-                )).toList(),
-              ),
-            ],
-            SizedBox(height: res.hp(4)),
-          ],
-        ),
+                SizedBox(height: res.hp(3)),
+                Text(
+                  'Sleep Timer',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (playback.isSleepTimerActive) ...[
+                  SizedBox(height: res.hp(2)),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: res.wp(4), vertical: res.hp(1.5)),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      'Remaining: ${_formatDuration(playback.sleepTimerDuration!)}',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: res.sp(16),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: res.hp(4)),
+                  ElevatedButton(
+                    onPressed: () {
+                      HapticFeedback.mediumImpact();
+                      ref.read(playbackProvider.notifier).cancelSleepTimer();
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                      minimumSize: Size(double.infinity, res.hp(7)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
+                    ),
+                    child: const Text('Stop Timer', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ] else ...[
+                  SizedBox(height: res.hp(4)),
+                  Text(
+                    '${customMinutes.toInt()} minutes',
+                    style: TextStyle(
+                      fontSize: res.sp(32),
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  SizedBox(height: res.hp(2)),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: Theme.of(context).colorScheme.primary,
+                      inactiveTrackColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                      thumbColor: Theme.of(context).colorScheme.primary,
+                      overlayColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                      trackHeight: 8,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12),
+                    ),
+                    child: Slider(
+                      value: customMinutes,
+                      min: 1,
+                      max: 120,
+                      divisions: 119,
+                      onChanged: (value) {
+                        setState(() => customMinutes = value);
+                        if (value.toInt() % 5 == 0) {
+                          HapticFeedback.selectionClick();
+                        }
+                      },
+                    ),
+                  ),
+                  SizedBox(height: res.hp(3)),
+                  Wrap(
+                    spacing: res.wp(3),
+                    runSpacing: res.hp(1.5),
+                    alignment: WrapAlignment.center,
+                    children: [15, 30, 45, 60].map((mins) => ChoiceChip(
+                      label: Text('$mins mins'),
+                      selected: false,
+                      onSelected: (_) {
+                        HapticFeedback.lightImpact();
+                        ref.read(playbackProvider.notifier).setSleepTimer(Duration(minutes: mins));
+                        Navigator.pop(context);
+                      },
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    )).toList(),
+                  ),
+                  SizedBox(height: res.hp(4)),
+                  ElevatedButton(
+                    onPressed: () {
+                      HapticFeedback.mediumImpact();
+                      ref.read(playbackProvider.notifier).setSleepTimer(
+                        Duration(minutes: customMinutes.toInt()),
+                      );
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      minimumSize: Size(double.infinity, res.hp(7)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 4,
+                      shadowColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+                    ),
+                    child: const Text('Set Timer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -312,10 +420,11 @@ class PlayerScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSongInfo(BuildContext context, Responsive res, Song song) {
+  Widget _buildSongInfo(BuildContext context, Responsive res, Song song, WidgetRef ref) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: res.wp(10)),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             song.title,
@@ -328,7 +437,7 @@ class PlayerScreen extends ConsumerWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          SizedBox(height: res.hp(1)),
+          SizedBox(height: res.hp(0.5)),
           Text(
             song.artist,
             style: TextStyle(
@@ -390,13 +499,46 @@ class PlayerScreen extends ConsumerWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        IconButton(
-          icon: Icon(
-            playback.isShuffled ? Icons.shuffle_on_rounded : Icons.shuffle_rounded,
-            color: playback.isShuffled ? Theme.of(context).colorScheme.primary : Colors.white38,
-            size: res.sp(26),
-          ),
-          onPressed: () => ref.read(playbackProvider.notifier).toggleShuffle(),
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              icon: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) =>
+                    ScaleTransition(scale: animation, child: child),
+                child: Icon(
+                  playback.isShuffled
+                      ? Icons.shuffle_on_rounded
+                      : Icons.shuffle_rounded,
+                  key: ValueKey(playback.isShuffled),
+                  color: playback.isShuffled
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.white38,
+                  size: res.sp(26),
+                ),
+              ),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                ref.read(playbackProvider.notifier).toggleShuffle();
+              },
+            ),
+            Positioned(
+              bottom: 4,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: playback.isShuffled ? 1.0 : 0.0,
+                child: Container(
+                  width: 4,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
         IconButton(
           icon: const Icon(Icons.skip_previous_rounded, color: Colors.white),
@@ -430,19 +572,52 @@ class PlayerScreen extends ConsumerWidget {
           iconSize: res.sp(40),
           onPressed: () => ref.read(playbackProvider.notifier).nextSong(),
         ),
-        IconButton(
-          icon: Icon(
-            playback.repeatMode == RepeatMode.one
-                ? Icons.repeat_one_on_rounded
-                : playback.repeatMode == RepeatMode.all
-                    ? Icons.repeat_on_rounded
-                    : Icons.repeat_rounded,
-            color: playback.repeatMode != RepeatMode.none
-                ? Theme.of(context).colorScheme.primary
-                : Colors.white38,
-            size: res.sp(26),
-          ),
-          onPressed: () => ref.read(playbackProvider.notifier).cycleRepeatMode(),
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              icon: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: ScaleTransition(scale: animation, child: child),
+                  );
+                },
+                child: Icon(
+                  playback.repeatMode == RepeatMode.one
+                      ? Icons.repeat_one_on_rounded
+                      : playback.repeatMode == RepeatMode.all
+                          ? Icons.repeat_on_rounded
+                          : Icons.repeat_rounded,
+                  key: ValueKey(playback.repeatMode),
+                  color: playback.repeatMode != RepeatMode.none
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.white38,
+                  size: res.sp(26),
+                ),
+              ),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                ref.read(playbackProvider.notifier).cycleRepeatMode();
+              },
+            ),
+            Positioned(
+              bottom: 4,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: playback.repeatMode != RepeatMode.none ? 1.0 : 0.0,
+                child: Container(
+                  width: 4,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

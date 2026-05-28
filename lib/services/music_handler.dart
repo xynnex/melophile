@@ -10,7 +10,6 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   final _playlist = ConcatenatingAudioSource(children: []);
   Song? _currentSong;
   final _volumeController = StreamController<double>.broadcast();
-  bool _isTransitioning = false;
   
   void Function()? onSkipToNextCall;
   void Function()? onSkipToPreviousCall;
@@ -137,6 +136,13 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> skipToPrevious() => _player.seekToPrevious();
 
+  @override
+  Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
+    final enabled = shuffleMode == AudioServiceShuffleMode.all;
+    await _player.setShuffleModeEnabled(enabled);
+    _updatePlaybackState();
+  }
+
   Future<void> setPlaylist(List<Song> songs, {int initialIndex = 0}) async {
     final sources = songs.map((song) {
       final item = MediaItem(
@@ -151,6 +157,8 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
       return AudioSource.uri(Uri.file(song.filePath), tag: item);
     }).toList();
 
+    // Only update if the playlist has actually changed to avoid interruptions
+    // For now, simple clear and add is okay, but we should be careful with the completed state
     await _playlist.clear();
     await _playlist.addAll(sources);
     

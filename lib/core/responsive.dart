@@ -10,7 +10,7 @@ class Responsive {
 
   double get width => _mediaQueryData.size.width;
   double get height => _mediaQueryData.size.height;
-  double get textScaleFactor => _mediaQueryData.textScaleFactor;
+  double get textScaleFactor => _mediaQueryData.textScaler.scale(1);
   EdgeInsets get padding => _mediaQueryData.padding;
   double get viewInsetsBottom => _mediaQueryData.viewInsets.bottom;
 
