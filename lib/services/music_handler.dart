@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:just_audio/just_audio.dart';
 import '../models/song.dart';
 
@@ -16,8 +17,12 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     _init();
   }
 
-  void _init() {
-    // Initial state
+  Future<void> _init() async {
+    debugPrint('MusicHandler: Initializing AudioSession...');
+    final session = await AudioSession.instance;
+    await session.configure(const AudioSessionConfiguration.music());
+
+    // Initial state to satisfy Android
     playbackState.add(PlaybackState(
       controls: [MediaControl.play],
       systemActions: const {
@@ -33,12 +38,38 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
       playing: false,
     ));
 
+    // Handle audio interruptions (phone calls, etc.)
+    session.interruptionEventStream.listen((event) {
+      if (event.begin) {
+        switch (event.type) {
+          case AudioInterruptionType.pause:
+          case AudioInterruptionType.unknown:
+            pause();
+            break;
+          case AudioInterruptionType.duck:
+            _player.setVolume(0.5);
+            break;
+        }
+      } else {
+        switch (event.type) {
+          case AudioInterruptionType.pause:
+          case AudioInterruptionType.unknown:
+            play();
+            break;
+          case AudioInterruptionType.duck:
+            _player.setVolume(1.0);
+            break;
+        }
+      }
+    });
+
     // Listen to player state changes
     _player.playbackEventStream.listen(_onPlaybackEvent);
     _player.playerStateStream.listen(_onPlayerStateChanged);
     _player.positionStream.listen(_onPositionChanged);
     _player.durationStream.listen(_onDurationChanged);
     _player.volumeStream.listen((v) => _volumeController.add(v));
+    debugPrint('MusicHandler: Initialization complete');
   }
 
   void _onPlaybackEvent(PlaybackEvent event) {
@@ -147,8 +178,12 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> onTaskRemoved() async {
-    debugPrint('MusicHandler: Task removed (app swiped)');
-    // Keep playing
+    debugPrint('MusicHandler: onTaskRemoved (app swiped)');
+    // If playing, keep service alive. 
+    // Android 14+ needs this explicitly if we want to stay persistent.
+    if (_player.playing) {
+      _updatePlaybackState();
+    }
   }
 
   @override
@@ -161,7 +196,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     debugPrint('MusicHandler: Starting playback for ${song.title}');
     _currentSong = song;
 
-    // 1. Update MediaItem immediately
+    // 1. Update MediaItem immediately to satisfy Android MediaSession
     mediaItem.add(MediaItem(
       id: song.id.toString(),
       title: song.title,

@@ -20,8 +20,12 @@ class PersistenceService {
           .toList();
 
       debugPrint('PersistenceService: Saving ${songsList.length} songs to Hive as a list...');
+      
       // Use a single key for the entire list to avoid key range issues
+      // We also use a secondary backup key for redundancy
       await _songsBox.put('library', songsList);
+      await _songsBox.put('library_backup', songsList);
+      
       await _songsBox.flush();
       debugPrint('PersistenceService: Library saved successfully');
     } catch (e) {
@@ -31,25 +35,38 @@ class PersistenceService {
 
   List<Song> getSongs() {
     try {
-      if (!Hive.isBoxOpen('songs')) return [];
+      if (!Hive.isBoxOpen('songs')) {
+        debugPrint('PersistenceService.getSongs: Box "songs" is not open');
+        return [];
+      }
       
-      final dynamic data = _songsBox.get('library');
+      // Try primary key first
+      dynamic data = _songsBox.get('library');
+      
+      // Fallback to backup if primary is empty
+      if (data == null || (data is List && data.isEmpty)) {
+        data = _songsBox.get('library_backup');
+      }
+
       if (data is List) {
         final List<Song> songs = data
             .map((item) => Song.fromMap(Map<dynamic, dynamic>.from(item as Map)))
             .where((s) => s.id != -1)
             .toList();
-        debugPrint('PersistenceService: Loaded ${songs.length} songs from list');
+        debugPrint('PersistenceService: Loaded ${songs.length} songs from Hive list');
         return songs;
       }
       
-      // Fallback for old format if any
+      // Emergency fallback for very old formats (individual entries)
       final List<Song> oldSongs = [];
       for (var value in _songsBox.values) {
         if (value is Map && value.containsKey('filePath')) {
           final song = Song.fromMap(Map<dynamic, dynamic>.from(value));
           if (song.id != -1) oldSongs.add(song);
         }
+      }
+      if (oldSongs.isNotEmpty) {
+        debugPrint('PersistenceService: Recovered ${oldSongs.length} songs from old format');
       }
       return oldSongs;
     } catch (e) {
@@ -62,22 +79,25 @@ class PersistenceService {
     try {
       if (song.id == -1) return;
       await _favoritesBox.put(song.filePath, song.toMap());
+      await _favoritesBox.flush();
     } catch (e) {
       debugPrint('PersistenceService.saveFavorite error: $e');
     }
   }
 
   Future<void> removeFavorite(int songId) async {
-    // Note: If we use filePath as key, we should ideally use it here too.
-    // But since favorites box might still use IDs, I'll update it to be consistent.
-    // For now, I'll find by ID if needed, but better to use filePath.
     try {
+      // Find key by matching ID in the map values
       final key = _favoritesBox.keys.firstWhere(
-        (k) => _favoritesBox.get(k)['id'] == songId,
+        (k) {
+          final val = _favoritesBox.get(k);
+          return val is Map && val['id'] == songId;
+        },
         orElse: () => null,
       );
       if (key != null) {
         await _favoritesBox.delete(key);
+        await _favoritesBox.flush();
       }
     } catch (e) {
       debugPrint('PersistenceService.removeFavorite error: $e');
@@ -107,15 +127,11 @@ class PersistenceService {
   Future<void> addToHistory(Song song) async {
     try {
       if (song.id == -1) return;
-      
-      // Prevent duplicates in history box if possible
-      // (Hive add just appends, so we might want to check or use put)
       await _historyBox.add(song.toMap());
-      
-      // Limit history size
       if (_historyBox.length > 50) {
         await _historyBox.deleteAt(0);
       }
+      await _historyBox.flush();
     } catch (e) {
       debugPrint('PersistenceService.addToHistory error: $e');
     }
@@ -146,6 +162,9 @@ class PersistenceService {
       await _songsBox.clear();
       await _favoritesBox.clear();
       await _historyBox.clear();
+      await _songsBox.flush();
+      await _favoritesBox.flush();
+      await _historyBox.flush();
     } catch (e) {
       debugPrint('PersistenceService.clearLibrary error: $e');
     }
