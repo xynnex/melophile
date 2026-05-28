@@ -41,6 +41,7 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   flutter_svg: ^2.0.10+1
+  audio_session: ^0.1.25
 
 dev_dependencies:
   flutter_test:
